@@ -1,15 +1,14 @@
-export const DURATION=28;
+export const DURATION=32;
 export const schema={
  aspect:{type:'enum',values:['3:4','9:16','16:9'],label:'Frame'},
  time:{type:'number',min:0,max:DURATION,label:'Scene time'},
  paused:{type:'boolean',label:'Pause'},
  motion:{type:'number',min:0,max:1.6,label:'Gestures'},
  wind:{type:'number',min:0,max:1.6,label:'Night breeze'},
- reveal:{type:'number',min:0,max:1,label:'Lantern translucency'},
  light:{type:'number',min:.3,max:1.8,label:'Window light'},
  camera:{type:'number',min:-20,max:20,label:'Viewpoint'},
 } as const;
-export const defaults={aspect:'3:4',time:0,paused:false,motion:1,wind:1,reveal:.88,light:1,camera:0};
+export const defaults={aspect:'3:4',time:0,paused:false,motion:1,wind:1,light:1,camera:0};
 export type ArtState=typeof defaults;
 export function validatePatch(value:unknown):Partial<ArtState>{
  if(!value||typeof value!=='object'||Array.isArray(value))throw Error('Expected a parameter object');

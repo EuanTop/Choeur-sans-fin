@@ -38,6 +38,12 @@ export function controlPlugin({rendererFactory=(root,origin)=>new Renderer(root,
     const path=new URL(req.url,origin).pathname.slice(6);
     if(req.method==='GET'&&path==='')return reply(res,200,{protocol:1,project:'duck-feet',duration:DURATION,capabilities:['schema','state.read','state.patch','capture','jobs','jobs.cancel'],rendererConnected:renderer.ready});
     if(req.method==='GET'&&path==='/jobs')return reply(res,200,{jobs:[...jobs.values()].map(publicJob)});
+    if(req.method==='GET'&&path==='/diagnostics'){
+     if(!renderer.ready||typeof renderer.call!=='function')throw error(503,'Capture renderer not connected');
+     const r=await renderer.call('Runtime.evaluate',{expression:'window.art.diagnostics()',returnByValue:true},10000);
+     if(r.exceptionDetails)throw error(500,'Artwork diagnostics failed');
+     return reply(res,200,r.result?.value??{});
+    }
     if(req.method==='GET'&&path==='/schema')return reply(res,200,{parameters:schema,defaults});
     if(req.method==='GET'&&path==='/state')return reply(res,200,{epoch,revision,state:current(),appliedRevision,frameTime});
     if(req.method==='PATCH'&&path==='/state'){

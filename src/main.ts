@@ -23,8 +23,8 @@ document.querySelector('#menu')!.addEventListener('click',()=>{document.querySel
 document.querySelector('#close')!.addEventListener('click',()=>{document.querySelector<HTMLElement>('#panel')!.hidden=true;});
 document.querySelector('#pause')!.addEventListener('click',()=>void patch({paused:!state.paused}));document.querySelector('#restart')!.addEventListener('click',()=>void patch({time:0,paused:false}));
 function text(w:number,h:number){
- ctx.save();ctx.fillStyle='#fff0cf';ctx.shadowColor='#1a1026aa';ctx.shadowBlur=w*.006;ctx.font=`${w*.071}px Goudy`;ctx.fillText('Duck Feet',w*.055,h*.085);
- ctx.shadowBlur=0;ctx.font=`${w*.0125}px Arial`;ctx.letterSpacing=`${w*.002}px`;ctx.fillText('NOT QUITE A SWAN.',w*.058,h*.112);ctx.letterSpacing='0px';ctx.font=`${w*.023}px Goudy`;ctx.textAlign='right';ctx.fillText('@EuanTop',w*.945,h*.961);ctx.restore();
+ ctx.save();ctx.fillStyle='#fff0cf';ctx.shadowColor='#1a1026aa';ctx.shadowBlur=w*.005;ctx.font=`${w*.049}px Goudy`;ctx.fillText('Duck Feet',w*.055,h*.065);
+ ctx.shadowBlur=0;ctx.font=`${w*.023}px Goudy`;ctx.textAlign='right';ctx.fillText('@EuanTop',w*.945,h*.961);ctx.restore();
 }
 try{
  await document.fonts.load('24px Goudy');const art=await createArtwork();

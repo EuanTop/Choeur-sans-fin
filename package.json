@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "A yellow duck, a swan paper lantern, and a Halloween canal quarter.",
+  "description": "A duck in a swan hood, walking through an endless Halloween canal quarter.",
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 5176 --strictPort",
     "check": "tsc --noEmit",
