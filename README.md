@@ -4,14 +4,14 @@
 <p><b>English</b> · <a href="README.zh-CN.md">简体中文</a></p>
 </div>
 
-A real-time Three.js artwork by @EuanTop. A yellow duck swims through purple light halls nested inside hollow pumpkin lanterns. The continuous 32-second pullback moves from one scale to the next.
+A real-time Three.js artwork by @EuanTop. A yellow duck swims through purple light halls nested inside hollow pumpkin lanterns. One duck stays with the camera as the continuous 32-second pullback moves from one scale to the next; swans sing from the curved arcades.
 
 ```sh
 npm ci
 npm run dev
 ```
 
-Open `http://127.0.0.1:5176/`. Default framing is 3:4 portrait. The collapsible panel controls time, swimming, water movement, light and viewpoint, with PNG capture. This visual study does not yet include music or video export.
+Open `http://127.0.0.1:5176/`. Default framing is 3:4 portrait. The collapsible panel controls time, swimming, water movement, light and viewpoint, with PNG capture. Enable music in the panel to hear the original synthesized choir and organ score. Side glances and wing gestures share its cue times. Video export is not included yet.
 
 ```sh
 npm test

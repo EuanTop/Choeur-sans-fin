@@ -68,5 +68,12 @@ export class Renderer {
   const url=r.result?.value;if(typeof url!=='string'||!url.startsWith('data:image/png;base64,'))throw Error('Renderer did not return a PNG');
   return Buffer.from(url.split(',')[1],'base64');
  }
+ async audio(state){
+  await this.frame(0,64,64,state);
+  const r=await this.call('Runtime.evaluate',{expression:'window.art.renderMusic()',returnByValue:true,awaitPromise:true},90000);
+  if(r.exceptionDetails)throw Error(r.exceptionDetails.exception?.description||r.exceptionDetails.text);
+  if(typeof r.result?.value?.base64!=='string')throw Error('Music renderer did not return WAV data');
+  return {...r.result.value,bytes:Buffer.from(r.result.value.base64,'base64')};
+ }
  async close(){const process=this.process;this.process=undefined;try{this.socket?.close();if(process&&process.exitCode===null){process.kill();await Promise.race([once(process,'exit'),new Promise(resolve=>setTimeout(resolve,2500))]);}}catch{}this.ready=false;this.connecting=undefined;}
 }

@@ -10,8 +10,8 @@ import {controlPlugin} from '../scripts/control.mjs';
 
 test('local control: atomic state, exact pause clock, Origin guards, capture lifecycle',async()=>{
  const root=await mkdtemp(join(tmpdir(),'cloth-control-'));await mkdir(join(root,'artifacts'));
- let tick=0,handler:any,resolveFrame:any,calls=0;
- const renderer={ready:true,close(){},frame(){calls++;return new Promise(resolve=>{resolveFrame=resolve;});}};
+ let tick=0,handler:any,resolveFrame:any,resolveAudio:any,calls=0,musicCalls=0;
+ const renderer={ready:true,close(){},audio(){musicCalls++;return new Promise(resolve=>{resolveAudio=resolve;});},frame(){calls++;return new Promise(resolve=>{resolveFrame=resolve;});}};
  const plugin=controlPlugin({rendererFactory:()=>renderer,now:()=>tick});
  plugin.configureServer({config:{root,server:{port:5176}},httpServer:{on(){}},middlewares:{use(fn:any){handler=fn;}}});
  async function request(method:string,path:string,value?:unknown,origin='http://127.0.0.1:5176'){
@@ -41,6 +41,20 @@ test('local control: atomic state, exact pause clock, Origin guards, capture lif
   r=await request('POST','/capture',{...command,idempotencyKey:'cancel-me'});const canceled=r.body.jobId;resolveFrame=null;while(!resolveFrame)await new Promise(resolve=>setImmediate(resolve));
   await request('POST','/jobs/'+canceled+'/cancel',{});resolveFrame(Buffer.from('must-not-publish'));
   await new Promise(resolve=>setTimeout(resolve,10));job=(await request('GET','/jobs/'+canceled)).body;assert.equal(job.status,'canceled');assert.deepEqual(job.files,[]);
+  const score=(await request('GET','/music/score')).body;
+  assert.equal(score.duration,DURATION);assert.deepEqual(score.cues.map((c:any)=>c.time),[4,12,20,28]);
+  assert.equal((await request('POST','/music/render',{revision:2,version:'stale',idempotencyKey:'bad-music'})).status,409);
+  const musicCommand={revision:2,version:score.version,idempotencyKey:'music-once'};
+  r=await request('POST','/music/render',musicCommand);const musicId=r.body.jobId;
+  while(!resolveAudio)await new Promise(resolve=>setImmediate(resolve));
+  assert.equal((await request('POST','/music/render',musicCommand)).body.jobId,musicId);assert.equal(musicCalls,1);
+  resolveAudio({version:score.version,bytes:Buffer.from('mock-wave')});
+  for(let i=0;i<100;i++){job=(await request('GET','/jobs/'+musicId)).body;if(job.status==='completed')break;await new Promise(resolve=>setTimeout(resolve,2));}
+  assert.equal(job.status,'completed');assert.equal(job.files[0].channels,2);assert.equal((await readFile(job.files[0].path)).toString(),'mock-wave');
+  resolveAudio=null;r=await request('POST','/music/render',{...musicCommand,idempotencyKey:'cancel-music'});const cancelMusic=r.body.jobId;
+  while(!resolveAudio)await new Promise(resolve=>setImmediate(resolve));await request('POST','/jobs/'+cancelMusic+'/cancel',{});
+  resolveAudio({version:score.version,bytes:Buffer.from('do-not-publish')});await new Promise(resolve=>setTimeout(resolve,10));
+  assert.deepEqual((await request('GET','/jobs/'+cancelMusic)).body.files,[]);
   tick=50000;s=await request('GET','/state');assert.ok(s.body.state.time<DURATION);assert.equal(s.body.state.paused,false);
   r=await request('PATCH','/state',{expectedRevision:2,patch:{time:0,paused:false}});assert.equal(r.status,200);tick=51000;s=await request('GET','/state');assert.equal(s.body.state.time,1);
  }finally{await rm(root,{recursive:true,force:true});}

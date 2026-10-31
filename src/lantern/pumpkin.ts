@@ -2,7 +2,7 @@ import * as T from 'three';
 import {arch,batch} from './geometry.ts';
 import {plaster,luminous,lightField} from './materials.ts';
 
-export const PUMPKIN={radius:8,height:6,centreY:5,depth:4.5,thickness:.55};
+export const PUMPKIN={radius:8,height:6,centreY:5,depth:4.5,thickness:1.0};
 export function skinPoint(x:number,y:number,inner=false){
  const {radius:r,height:h,centreY:c,depth:d}=PUMPKIN;
  const z=d*Math.sqrt(Math.max(0,1-(x/r)**2-((y-c)/h)**2));
@@ -55,7 +55,7 @@ export function createPumpkin(){
  const lining=new T.Mesh(frontGeometry(true),inside);root.add(lining);
  const walls=new T.Mesh(cutWalls(),edge);root.add(walls);
  const eyeGlow=lightField('#ffca76','#ee7c2c',1.6);
- for(const side of [-1,1]){const g=new T.ShapeGeometry(eye(side),32),p=g.attributes.position!,uv=g.attributes.uv!;for(let i=0;i<p.count;i++){const x=p.getX(i),y=p.getY(i),v=skinPoint(x,y);p.setXYZ(i,v.x,y,v.z-.65);uv.setXY(i,(x-side*4.25)/2.1+.5,(y-8.1)/1.4);}g.computeVertexNormals();root.add(new T.Mesh(g,eyeGlow));}
+ for(const side of [-1,1]){const g=new T.ShapeGeometry(eye(side),32),p=g.attributes.position!,uv=g.attributes.uv!;for(let i=0;i<p.count;i++){const x=p.getX(i),y=p.getY(i),v=skinPoint(x,y);p.setXYZ(i,v.x,y,v.z-PUMPKIN.thickness-.18);uv.setXY(i,(x-side*4.25)/2.1+.5,(y-8.1)/1.4);}g.computeVertexNormals();root.add(new T.Mesh(g,eyeGlow));}
  const backGeo=new T.SphereGeometry(1,112,64,Math.PI,Math.PI);
  const p=backGeo.attributes.position!;
  for(let i=0;i<p.count;i++){const x=p.getX(i),y=p.getY(i),z=p.getZ(i),rib=1+.085*Math.cos(Math.atan2(x,z)*10);p.setXYZ(i,x*8*rib,5+y*6,z*4.5*rib);}backGeo.computeVertexNormals();

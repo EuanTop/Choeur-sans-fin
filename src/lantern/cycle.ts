@@ -16,9 +16,8 @@ export function zoomPose(time:number){
  const u=wrap(time)/DURATION,scale=RATIO**u;
  return {u,scale,position:CENTRE.clone().multiplyScalar(1-scale)};
 }
+/** The camera follows one passenger; the recursive environment supplies the travel. */
 export function duckPose(time:number){
- const p=wrap(time)/DURATION*TAU;
- const position=new Vector3(-3.2+3.5*Math.sin(p),-.22,9+1.5*Math.cos(p));
- const tangent=new Vector3(3.5*Math.cos(p),0,-1.5*Math.sin(p)).normalize();
- return {position,tangent,yaw:Math.atan2(tangent.x,tangent.z),phase:p};
+ const phase=wrap(time)/DURATION*TAU;
+ return {position:new Vector3(.045*Math.sin(phase*2),-.22,10+.07*Math.sin(phase)),tangent:new Vector3(0,0,1),yaw:0,phase};
 }

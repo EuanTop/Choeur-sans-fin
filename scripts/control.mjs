@@ -1,7 +1,8 @@
 import {randomUUID} from 'node:crypto';
-import {mkdir,writeFile,stat,rm} from 'node:fs/promises';
+import {mkdir,writeFile,stat,rm,rename,readdir,readFile} from 'node:fs/promises';
 import {join} from 'node:path';
 import {defaults,schema,validatePatch,DURATION} from '../src/state.ts';
+import {musicScore,MUSIC_VERSION} from '../src/music/score.ts';
 import {Renderer} from './renderer.mjs';
 
 export function controlPlugin({rendererFactory=(root,origin)=>new Renderer(root,origin),now=()=>performance.now()}={}){
@@ -36,7 +37,15 @@ export function controlPlugin({rendererFactory=(root,origin)=>new Renderer(root,
     if(!hosts.includes(req.headers.host))throw error(403,'Invalid Host');
     if(req.method!=='GET'&&req.headers.origin!=='http://'+req.headers.host)throw error(403,'Same-origin request required');
     const path=new URL(req.url,origin).pathname.slice(6);
-    if(req.method==='GET'&&path==='')return reply(res,200,{protocol:1,project:'inside-the-lantern',duration:DURATION,capabilities:['schema','state.read','state.patch','capture','jobs','jobs.cancel'],rendererConnected:renderer.ready});
+    if(req.method==='GET'&&path==='')return reply(res,200,{protocol:1,project:'inside-the-lantern',duration:DURATION,capabilities:['schema','state.read','state.patch','capture','jobs','jobs.cancel','music.score','music.render'],rendererConnected:renderer.ready});
+    if(req.method==='GET'&&path==='/music/audio'){
+     const dir=join(root,'artifacts/audio');let entries=[];
+     try{entries=(await readdir(dir)).filter(p=>p.startsWith(MUSIC_VERSION+'-')&&p.endsWith('.wav'));}catch{throw error(404,'Music has not been rendered');}
+     const files=await Promise.all(entries.map(async p=>({path:join(dir,p),stat:await stat(join(dir,p))})));files.sort((a,b)=>b.stat.mtimeMs-a.stat.mtimeMs);
+     const file=files.find(f=>f.stat.size===44+DURATION*44100*4);if(!file)throw error(404,'Music has not been rendered');
+     const bytes=await readFile(file.path);res.writeHead(200,{'Content-Type':'audio/wav','Content-Length':bytes.length,'Cache-Control':'no-store','X-Music-Version':MUSIC_VERSION});res.end(bytes);return;
+    }
+    if(req.method==='GET'&&path==='/music/score')return reply(res,200,musicScore());
     if(req.method==='GET'&&path==='/jobs')return reply(res,200,{jobs:[...jobs.values()].map(publicJob)});
     if(req.method==='GET'&&path==='/diagnostics'){
      if(!renderer.ready||typeof renderer.call!=='function')throw error(503,'Capture renderer not connected');
@@ -60,6 +69,16 @@ export function controlPlugin({rendererFactory=(root,origin)=>new Renderer(root,
      if(!Number.isInteger(w)||!Number.isInteger(h)||Math.min(w,h)<64||Math.max(w,h)>3840||w*h>11059200||!Number.isFinite(t)||t<0||t>DURATION)throw error(400,'Invalid capture size or time');
      const j={jobId:randomUUID(),status:'queued',progress:0,revision,snapshot:current(),files:[]};jobs.set(j.jobId,j);keys.set(key,{signature:sig,id:j.jobId});active=j.jobId;
      reply(res,202,publicJob(j));void capture(j,{...b,time:t});return;
+    }
+    if(req.method==='POST'&&path==='/music/render'){
+     const b=await body(req),key=b.idempotencyKey;
+     if(typeof key!=='string'||!key||key.length>128)throw error(400,'A bounded idempotency key is required');
+     const sig=JSON.stringify(b),prior=keys.get(key);if(prior){if(prior.signature!==sig)throw error(409,'Key belongs to another request');return reply(res,200,publicJob(jobs.get(prior.id)));}
+     if(b.version!==MUSIC_VERSION)throw error(409,'Music version changed');
+     if(b.revision!==revision)throw error(409,'Revision conflict');if(active)throw error(409,'A render is already running');if(jobs.size>=100)throw error(429,'Session job limit');
+     const j={jobId:randomUUID(),status:'running',progress:0,revision,version:MUSIC_VERSION,snapshot:current(),files:[]};jobs.set(j.jobId,j);keys.set(key,{signature:sig,id:j.jobId});active=j.jobId;
+     reply(res,202,publicJob(j));
+     void(async()=>{try{await stat(join(root,'artifacts'));const output=await renderer.audio(j.snapshot);if(j.status==='canceled')return;if(output.version!==j.version)throw Error('Music changed during rendering');const dir=join(root,'artifacts/audio');await mkdir(dir,{recursive:true});const path=join(dir,j.version+'-'+j.jobId+'.wav'),temporary=path+'.partial';try{await writeFile(temporary,output.bytes);if(j.status==='canceled')return;await rename(temporary,path);if(j.status==='canceled'){await rm(path,{force:true});return;}j.files=[{path,version:j.version,duration:DURATION,channels:2,sampleRate:44100}];j.status='completed';j.progress=1;}finally{await rm(temporary,{force:true});}}catch(e){if(j.status!=='canceled'){j.status='failed';j.error=e.message;}}finally{if(active===j.jobId)active=null;}})();return;
     }
     const match=path.match(/^\/jobs\/([a-zA-Z0-9-]+)(\/cancel)?$/);
     if(match){const j=jobs.get(match[1]);if(!j)throw error(404,'Unknown job');if(req.method==='GET'&&!match[2])return reply(res,200,publicJob(j));if(req.method==='POST'&&match[2]){await body(req);if(!['completed','failed','canceled'].includes(j.status))j.status='canceled';return reply(res,200,publicJob(j));}}

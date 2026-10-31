@@ -20,6 +20,22 @@ export function ribbon(points:T.Vector3[],width:number){
  points.forEach((p,i)=>{const tangent=points[Math.min(i+1,points.length-1)]!.clone().sub(points[Math.max(0,i-1)]!);const normal=new T.Vector3(tangent.z,0,-tangent.x).normalize();for(const s of [-1,1]){const v=p.clone().addScaledVector(normal,s*width/2);pos.push(v.x,v.y,v.z);uv.push((s+1)/2,i/(points.length-1));}if(i<points.length-1){const a=i*2;idx.push(a,a+2,a+1,a+1,a+2,a+3);}});
  const g=new T.BufferGeometry();g.setAttribute('position',new T.Float32BufferAttribute(pos,3));g.setAttribute('uv',new T.Float32BufferAttribute(uv,2));g.setIndex(idx);g.computeVertexNormals();return g;
 }
+/** One closed strip, with no coplanar overlap or internal end caps between segments. */
+export function solidRibbon(points:T.Vector3[],width:number,thickness:number){
+ const positions:number[]=[],uv:number[]=[],indices:number[]=[];
+ points.forEach((p,i)=>{
+  const tangent=points[Math.min(i+1,points.length-1)]!.clone().sub(points[Math.max(0,i-1)]!);
+  const normal=new T.Vector3(tangent.z,0,-tangent.x).normalize();
+  for(const y of [0,-thickness])for(const side of [-1,1]){
+   const v=p.clone().addScaledVector(normal,side*width/2);positions.push(v.x,v.y+y,v.z);uv.push((side+1)/2,i/(points.length-1));
+  }
+  if(i<points.length-1){const a=i*4;
+   indices.push(a,a+4,a+1,a+1,a+4,a+5,a+2,a+3,a+6,a+3,a+7,a+6,a,a+2,a+4,a+2,a+6,a+4,a+1,a+5,a+3,a+3,a+5,a+7);
+  }
+ });
+ const end=(points.length-1)*4;indices.push(0,1,2,1,3,2,end,end+2,end+1,end+1,end+2,end+3);
+ const g=new T.BufferGeometry();g.setAttribute('position',new T.Float32BufferAttribute(positions,3));g.setAttribute('uv',new T.Float32BufferAttribute(uv,2));g.setIndex(indices);g.computeVertexNormals();return g;
+}
 /** Batch static surfaces by material; dynamic and instanced geometry stay separate. */
 export function batch(root:T.Group){
  root.updateMatrixWorld(true);const inverse=root.matrixWorld.clone().invert();const buckets=new Map<string,{mat:T.Material;geos:T.BufferGeometry[];cast:boolean;receive:boolean}>(),remove:T.Mesh[]=[];
