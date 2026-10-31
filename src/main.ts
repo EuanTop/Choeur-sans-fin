@@ -23,7 +23,7 @@ document.querySelector('#menu')!.addEventListener('click',()=>{document.querySel
 document.querySelector('#close')!.addEventListener('click',()=>{document.querySelector<HTMLElement>('#panel')!.hidden=true;});
 document.querySelector('#pause')!.addEventListener('click',()=>void patch({paused:!state.paused}));document.querySelector('#restart')!.addEventListener('click',()=>void patch({time:0,paused:false}));
 function text(w:number,h:number){
- ctx.save();ctx.fillStyle='#fff0cf';ctx.shadowColor='#1a1026aa';ctx.shadowBlur=w*.005;ctx.font=`${w*.049}px Goudy`;ctx.fillText('Duck Feet',w*.055,h*.065);
+ ctx.save();ctx.fillStyle='#fff0cf';ctx.shadowColor='#1a1026aa';ctx.shadowBlur=w*.005;ctx.font=`${w*.049}px Goudy`;ctx.fillText('Inside the Lantern',w*.055,h*.065);
  ctx.shadowBlur=0;ctx.font=`${w*.023}px Goudy`;ctx.textAlign='right';ctx.fillText('@EuanTop',w*.945,h*.961);ctx.restore();
 }
 try{
@@ -32,7 +32,7 @@ try{
  function fit(){const [a,b]=state.aspect.split(':').map(Number),ratio=a!/b!;const w=Math.min(innerWidth,innerHeight*ratio),h=w/ratio;canvas.style.width=w+'px';canvas.style.height=h+'px';return [Math.round(w*Math.min(devicePixelRatio,1.5)),Math.round(h*Math.min(devicePixelRatio,1.5))];}
  window.art={ready:false,async renderFrame(t,w,h,s){draw(t,w,h,s);return canvas.toDataURL('image/png');},diagnostics:()=>art.diagnostics()};
  await poll();const size=fit();draw(state.time,size[0]!,size[1]!,state);window.art.ready=true;status.hidden=true;
- document.querySelector('#save')!.addEventListener('click',()=>{const a=document.createElement('a');a.download='duck-feet.png';a.href=canvas.toDataURL('image/png');a.click();});
+ document.querySelector('#save')!.addEventListener('click',()=>{const a=document.createElement('a');a.download='inside-the-lantern.png';a.href=canvas.toDataURL('image/png');a.click();});
  function animate(now:number){if(renderMode)return;try{const t=state.paused?state.time:(state.time+(now-anchor)/1000)%DURATION;const [w,h]=fit();draw(t,w!,h!,state);if(lastAck!==revision&&revision>=0){lastAck=revision;void fetch('/__art/ack',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({epoch,revision,frameTime:t})});}if(now-lastPoll>600){lastPoll=now;void poll();}requestAnimationFrame(animate);}catch(e){status.hidden=false;status.textContent=String(e);console.error(e);}}
  if(!renderMode)requestAnimationFrame(animate);addEventListener('pagehide',()=>art.dispose(),{once:true});
 }catch(e){status.textContent=String(e);console.error(e);}

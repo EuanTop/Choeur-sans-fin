@@ -27,3 +27,11 @@ test('a capture cannot accept a ready flag from the previous source revision',as
   await r.frame(0,100,100,{});assert.equal(reloads,1);
  }finally{await rm(root,{recursive:true,force:true});}
 });
+
+test('a failed renderer launch is closed and a subsequent attempt can reconnect',async()=>{
+ const r=new Renderer('/unused','http://127.0.0.1:5176');let attempts=0,closed=0;
+ r.open=async()=>{attempts++;if(attempts===1)throw Error('shader failed');r.ready=true;};
+ r.close=async()=>{closed++;r.ready=false;};
+ await assert.rejects(r.connect(),/shader failed/);assert.equal(closed,1);
+ await r.connect();assert.equal(attempts,2);assert.equal(r.ready,true);
+});

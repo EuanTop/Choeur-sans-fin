@@ -15,7 +15,7 @@ export class Renderer {
  async connect(){
   if(this.ready)return;
   if(this.connecting)return this.connecting;
-  this.connecting=this.open().catch(e=>{this.connecting=undefined;throw e});return this.connecting;
+  this.connecting=this.open().catch(async e=>{await this.close();this.connecting=undefined;throw e});return this.connecting;
  }
  async open(){
   const candidates=[process.env.CHROME_PATH,'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome','/usr/bin/chromium','/usr/bin/google-chrome'].filter(Boolean);
@@ -68,5 +68,5 @@ export class Renderer {
   const url=r.result?.value;if(typeof url!=='string'||!url.startsWith('data:image/png;base64,'))throw Error('Renderer did not return a PNG');
   return Buffer.from(url.split(',')[1],'base64');
  }
- async close(){try{this.socket?.close();this.process?.kill()}catch{}this.ready=false}
+ async close(){const process=this.process;this.process=undefined;try{this.socket?.close();if(process&&process.exitCode===null){process.kill();await Promise.race([once(process,'exit'),new Promise(resolve=>setTimeout(resolve,2500))]);}}catch{}this.ready=false;this.connecting=undefined;}
 }

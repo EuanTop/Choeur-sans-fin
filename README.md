@@ -1,25 +1,23 @@
 <div align="center">
-<h1>Duck Feet</h1>
-<p>A yellow duck in a swan hood. A winding street of watching windows.</p>
+<h1>Inside the Lantern</h1>
+<p>A world inside a pumpkin. Another lantern inside that world.</p>
 <p><b>English</b> · <a href="README.zh-CN.md">简体中文</a></p>
 </div>
 
-A real-time Three.js artwork by @EuanTop. The 32-second scene is in visual development; music and video export are not included yet.
+A real-time Three.js artwork by @EuanTop. A yellow duck swims through purple light halls nested inside hollow pumpkin lanterns. The continuous 32-second pullback moves from one scale to the next.
 
 ```sh
 npm ci
 npm run dev
 ```
 
-Open `http://127.0.0.1:5176/`. The right panel controls framing, time, gestures, breeze and lighting, and saves PNG images. Default framing is 3:4 portrait.
-
-The curved bridge and modular town share one scene clock. Households have individual palettes, resident gestures, candle rhythms and shutter timings. Residents reuse the series' original swan model; the duck and its hood are procedural geometry.
+Open `http://127.0.0.1:5176/`. Default framing is 3:4 portrait. The collapsible panel controls time, swimming, water movement, light and viewpoint, with PNG capture. This visual study does not yet include music or video export.
 
 ```sh
 npm test
 npm run build
 ```
 
-`src/` separates characters, architecture, water, bridge geometry, rendering and timing. The local `/__art` API shares panel state and supports exact-time PNG jobs and renderer diagnostics. Mutations require a matching Origin and revision. See [control API](docs/control.md) and [credits](docs/credits.md).
+`src/lantern/` contains the hollow shell, arcades, materials, water, character, lighting and scale cycle. The recursive transform `F(x) = 0.2x + (0, 0, -3.6)` shares a fixed point with the pullback, allowing each parent world to replace its child at the loop boundary. Six shared-geometry levels approximate the endless scene.
 
-Generated media and private working material stay in the ignored `artifacts/` directory.
+The local `/__art` API shares panel state and supports exact-time PNG jobs and renderer diagnostics. See [control API](docs/control.md) and [credits](docs/credits.md). Generated media and private material stay in ignored `artifacts/`.

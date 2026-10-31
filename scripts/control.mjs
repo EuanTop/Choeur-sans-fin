@@ -26,7 +26,7 @@ export function controlPlugin({rendererFactory=(root,origin)=>new Renderer(root,
   }catch(e){if(j.status!=='canceled'){j.status='failed';j.error=e.message;}}
   finally{if(active===j.jobId)active=null;}
  }
- return {name:'duck-feet-control',configureServer(server){
+ return {name:'lantern-control',configureServer(server){
   root=server.config.root;origin=`http://127.0.0.1:${server.config.server.port}`;renderer=rendererFactory(root,origin);
   server.httpServer?.on('close',()=>renderer.close());
   server.middlewares.use(async(req,res,next)=>{
@@ -36,7 +36,7 @@ export function controlPlugin({rendererFactory=(root,origin)=>new Renderer(root,
     if(!hosts.includes(req.headers.host))throw error(403,'Invalid Host');
     if(req.method!=='GET'&&req.headers.origin!=='http://'+req.headers.host)throw error(403,'Same-origin request required');
     const path=new URL(req.url,origin).pathname.slice(6);
-    if(req.method==='GET'&&path==='')return reply(res,200,{protocol:1,project:'duck-feet',duration:DURATION,capabilities:['schema','state.read','state.patch','capture','jobs','jobs.cancel'],rendererConnected:renderer.ready});
+    if(req.method==='GET'&&path==='')return reply(res,200,{protocol:1,project:'inside-the-lantern',duration:DURATION,capabilities:['schema','state.read','state.patch','capture','jobs','jobs.cancel'],rendererConnected:renderer.ready});
     if(req.method==='GET'&&path==='/jobs')return reply(res,200,{jobs:[...jobs.values()].map(publicJob)});
     if(req.method==='GET'&&path==='/diagnostics'){
      if(!renderer.ready||typeof renderer.call!=='function')throw error(503,'Capture renderer not connected');

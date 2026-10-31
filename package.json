@@ -1,9 +1,9 @@
 {
-  "name": "duck-feet",
-  "version": "0.1.0",
+  "name": "inside-the-lantern",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
-  "description": "A duck in a swan hood, walking through an endless Halloween canal quarter.",
+  "description": "A swimming duck and an endlessly nested pumpkin light hall, rendered in Three.js.",
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 5176 --strictPort",
     "check": "tsc --noEmit",

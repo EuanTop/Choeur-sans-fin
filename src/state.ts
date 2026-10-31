@@ -3,9 +3,9 @@ export const schema={
  aspect:{type:'enum',values:['3:4','9:16','16:9'],label:'Frame'},
  time:{type:'number',min:0,max:DURATION,label:'Scene time'},
  paused:{type:'boolean',label:'Pause'},
- motion:{type:'number',min:0,max:1.6,label:'Gestures'},
+ motion:{type:'number',min:0,max:1.6,label:'Swimming motion'},
  wind:{type:'number',min:0,max:1.6,label:'Night breeze'},
- light:{type:'number',min:.3,max:1.8,label:'Window light'},
+ light:{type:'number',min:.3,max:1.8,label:'Amber light'},
  camera:{type:'number',min:-20,max:20,label:'Viewpoint'},
 } as const;
 export const defaults={aspect:'3:4',time:0,paused:false,motion:1,wind:1,light:1,camera:0};

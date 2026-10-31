@@ -12,7 +12,7 @@ The Vite service binds to `127.0.0.1:5176`. The panel and API use the same state
 | `GET /__art/jobs` | Current session jobs |
 | `GET /__art/jobs/:id` | Status and completed file path |
 | `POST /__art/jobs/:id/cancel` | Cancel an unfinished job |
-| `GET /__art/diagnostics` | Capture renderer timings, shader errors and household profiles |
+| `GET /__art/diagnostics` | Capture renderer timings, shader errors and recursive scale levels |
 
 Mutations require an `Origin` matching the local Host. Use the current revision; a conflict returns 409. A capture request contains:
 

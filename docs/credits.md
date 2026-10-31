@@ -1,8 +1,8 @@
 # Credits
 
-- Swan residents: original procedural model by EuanTop, reused unchanged from Crescent Lake / Around the Bend. No downloaded third-party swan model.
-- Yaya, swan hood, architecture and vegetation: procedural geometry for this scene.
+- Architecture, hollow pumpkin shell, procedural materials, recursive layout and water: original code for this artwork.
+- Yaya: the series' original procedural duck proportions from Around the Bend / No Need to Arrive, adapted for swimming. No downloaded character model.
 - Goudy Bookletter 1911: local font; source and SIL Open Font License are included in `public/fonts/`.
-- Three.js and bundled utilities / postprocessing: MIT.
+- Three.js and bundled Reflector, RoomEnvironment, RoundedBoxGeometry and postprocessing utilities: MIT.
 
-Concept images remain working references in ignored local artifacts. Runtime visuals use geometry and shaders; no generated background image is displayed.
+Generated concept images are design references in ignored artifacts. Runtime visuals use geometry and shaders, with live rendered planar reflections; no concept image or video is played as the scene.
