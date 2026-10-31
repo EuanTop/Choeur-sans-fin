@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {CHOIR_SECTIONS} from '../src/music/voices.ts';
 import {CHORDS,harmonyAt} from '../src/music/score.ts';
 import {cyclePitchCorrection} from '../src/music/soundtrack.ts';
 import {PERFORMANCE_CUES,chorusEnergyAt,sectionEnergyAt} from '../src/lantern/performance.ts';
@@ -27,7 +28,7 @@ test('continuous choir lines move by small intervals and return to the opening v
 });
 test('persistent voices close their oscillator phase without an audible tuning change',()=>{
  for(let lane=0;lane<6;lane++)for(const detune of [-5.5,0,5.8]){
-  const frequencies=CHORDS.map(h=>440*2**((h.notes[lane]!-69)/12)*2**(detune/1200));
+  const frequencies=CHORDS.map(h=>440*2**((h.notes[lane]!+CHOIR_SECTIONS[lane]!.transpose-69)/12)*2**(detune/1200));
   const correction=cyclePitchCorrection(frequencies,CHORDS.map(h=>h.duration));
   const cycles=frequencies.reduce((s,f,i)=>s+(f+correction)*CHORDS[i]!.duration,0);
   assert.ok(Math.abs(cycles-Math.round(cycles))<1e-8);

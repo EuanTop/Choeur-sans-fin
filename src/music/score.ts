@@ -1,6 +1,7 @@
+import {CHOIR_SECTIONS} from './voices.ts';
 import {DURATION} from '../state.ts';
 import {PERFORMANCE_CUES} from '../lantern/performance.ts';
-export const MUSIC_VERSION='lantern-gospel-04';
+export const MUSIC_VERSION='lantern-gospel-05';
 export const TEMPO=60;
 export type Harmony={time:number;duration:number;name:string;bass:number;notes:readonly number[];role:string};
 /** A warm major-key choral arc, with common tones and a gentle plagal return. */
@@ -16,4 +17,4 @@ export const CHORDS:readonly Harmony[]=[
  {time:30,duration:2,name:'Dadd9',bass:38,notes:[38,45,54,57,64,69],role:'plagal homecoming; the opening continues across the seam'},
 ];
 export function harmonyAt(time:number){const t=((time%DURATION)+DURATION)%DURATION;return [...CHORDS].reverse().find(c=>c.time<=t)!;}
-export function musicScore(){return {version:MUSIC_VERSION,duration:DURATION,tempo:TEMPO,meter:'slow four-beat choral phrases',key:'D major, with relative-minor shading',style:'Original sacred wordless choir; warm plagal harmony, 24 synthetic singers and a spacious hall',cues:PERFORMANCE_CUES,chords:CHORDS};}
+export function musicScore(){return {version:MUSIC_VERSION,duration:DURATION,tempo:TEMPO,meter:'slow four-beat choral phrases',key:'D major, with relative-minor shading',style:'Original sacred wordless choir; warm plagal harmony, female-led mixed choir, 24 synthetic singers and a spacious hall',sections:CHOIR_SECTIONS,performedChords:CHORDS.map(h=>({...h,notes:h.notes.map((note,i)=>note+CHOIR_SECTIONS[i]!.transpose)})),cues:PERFORMANCE_CUES,chords:CHORDS};}

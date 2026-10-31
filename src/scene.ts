@@ -38,7 +38,7 @@ export async function createArtwork(){
    if(errors.length)throw Error('GLSL compilation failed: '+errors.join('\n'));
    frameCount++;frameMs=performance.now()-start;
   },
-  diagnostics(){return {title:'Inside the Lantern',frameMs,frameCount,passengers:scene.children.filter(o=>o.name==='Yaya / swimming').length,shaderErrors:errors,msaaSamples,depthRange:[camera.near,camera.far],zoom:zoomPose(lastTime),recursiveLevels:world.levels.map(l=>({index:l.index,scale:l.group.getWorldScale(new T.Vector3()).x})),drawCalls:renderer.info.render.calls,triangles:renderer.info.render.triangles};},
+  diagnostics(){return {title:'Endless Chorus',frameMs,frameCount,passengers:scene.children.filter(o=>o.name==='Yaya / swimming').length,shaderErrors:errors,msaaSamples,depthRange:[camera.near,camera.far],zoom:zoomPose(lastTime),recursiveLevels:world.levels.map(l=>({index:l.index,scale:l.group.getWorldScale(new T.Vector3()).x})),drawCalls:renderer.info.render.calls,triangles:renderer.info.render.triangles};},
   dispose(){const geometries=new Set<T.BufferGeometry>(),materials=new Set<T.Material>();scene.traverse(o=>{if(o instanceof T.Mesh){geometries.add(o.geometry);for(const m of Array.isArray(o.material)?o.material:[o.material])materials.add(m);if(o.customDepthMaterial)materials.add(o.customDepthMaterial);if(o.customDistanceMaterial)materials.add(o.customDistanceMaterial);}if((o instanceof T.PointLight||o instanceof T.DirectionalLight||o instanceof T.SpotLight)&&o.shadow)o.shadow.dispose();});geometries.forEach(g=>g.dispose());materials.forEach(m=>m.dispose());water.dispose();environment.dispose();bloom.dispose();aa.dispose();output.dispose();composer.dispose();renderer.dispose();}
  };
 }

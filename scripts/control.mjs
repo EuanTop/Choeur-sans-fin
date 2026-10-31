@@ -4,8 +4,9 @@ import {join} from 'node:path';
 import {defaults,schema,validatePatch,DURATION} from '../src/state.ts';
 import {musicScore,MUSIC_VERSION} from '../src/music/score.ts';
 import {Renderer} from './renderer.mjs';
+import {video,profiles} from './video.mjs';
 
-export function controlPlugin({rendererFactory=(root,origin)=>new Renderer(root,origin),now=()=>performance.now()}={}){
+export function controlPlugin({rendererFactory=(root,origin)=>new Renderer(root,origin),now=()=>performance.now(),exporter=video}={}){
  const epoch=randomUUID();
  let revision=0,appliedRevision=-1,frameTime=0,state={...defaults},anchor=now();
  let root,renderer,origin,active;
@@ -14,7 +15,7 @@ export function controlPlugin({rendererFactory=(root,origin)=>new Renderer(root,
  const error=(code,message)=>Object.assign(Error(message),{code});
  const reply=(res,status,value)=>{res.writeHead(status,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify(value));};
  async function body(req){let size=0;const parts=[];for await(const p of req){size+=p.length;if(size>65536)throw error(413,'Request too large');parts.push(p);}try{const v=JSON.parse(Buffer.concat(parts).toString()||'{}');if(!v||typeof v!=='object'||Array.isArray(v))throw Error();return v;}catch{throw error(400,'Expected JSON object');}}
- const publicJob=j=>{const {snapshot,...rest}=j;return rest;};
+ const publicJob=j=>{const {snapshot,process,cleanup,timer,...rest}=j;return rest;};
  async function capture(j,b){
   j.status='running';
   try{
@@ -29,7 +30,7 @@ export function controlPlugin({rendererFactory=(root,origin)=>new Renderer(root,
  }
  return {name:'lantern-control',configureServer(server){
   root=server.config.root;origin=`http://127.0.0.1:${server.config.server.port}`;renderer=rendererFactory(root,origin);
-  server.httpServer?.on('close',()=>renderer.close());
+  server.httpServer?.on('close',()=>{for(const j of jobs.values())if(!['completed','failed','canceled'].includes(j.status)){j.status='canceled';j.process?.kill('SIGTERM');}return renderer.close();});
   server.middlewares.use(async(req,res,next)=>{
    if(!req.url?.startsWith('/__art'))return next();
    try{
@@ -37,7 +38,7 @@ export function controlPlugin({rendererFactory=(root,origin)=>new Renderer(root,
     if(!hosts.includes(req.headers.host))throw error(403,'Invalid Host');
     if(req.method!=='GET'&&req.headers.origin!=='http://'+req.headers.host)throw error(403,'Same-origin request required');
     const path=new URL(req.url,origin).pathname.slice(6);
-    if(req.method==='GET'&&path==='')return reply(res,200,{protocol:1,project:'inside-the-lantern',duration:DURATION,capabilities:['schema','state.read','state.patch','capture','jobs','jobs.cancel','music.score','music.render'],rendererConnected:renderer.ready});
+    if(req.method==='GET'&&path==='')return reply(res,200,{protocol:1,project:'endless-chorus',duration:DURATION,profiles,capabilities:['schema','state.read','state.patch','capture','exports','jobs','jobs.cancel','music.score','music.render'],rendererConnected:renderer.ready});
     if(req.method==='GET'&&path==='/music/audio'){
      const dir=join(root,'artifacts/audio');let entries=[];
      try{entries=(await readdir(dir)).filter(p=>p.startsWith(MUSIC_VERSION+'-')&&p.endsWith('.wav'));}catch{throw error(404,'Music has not been rendered');}
@@ -53,7 +54,7 @@ export function controlPlugin({rendererFactory=(root,origin)=>new Renderer(root,
      if(r.exceptionDetails)throw error(500,'Artwork diagnostics failed');
      return reply(res,200,r.result?.value??{});
     }
-    if(req.method==='GET'&&path==='/schema')return reply(res,200,{parameters:schema,defaults});
+    if(req.method==='GET'&&path==='/schema')return reply(res,200,{parameters:schema,defaults,profiles});
     if(req.method==='GET'&&path==='/state')return reply(res,200,{epoch,revision,state:current(),appliedRevision,frameTime});
     if(req.method==='PATCH'&&path==='/state'){
      const b=await body(req);if(b.expectedRevision!==revision)throw error(409,'Revision conflict');
@@ -80,8 +81,20 @@ export function controlPlugin({rendererFactory=(root,origin)=>new Renderer(root,
      reply(res,202,publicJob(j));
      void(async()=>{try{await stat(join(root,'artifacts'));const output=await renderer.audio(j.snapshot);if(j.status==='canceled')return;if(output.version!==j.version)throw Error('Music changed during rendering');const dir=join(root,'artifacts/audio');await mkdir(dir,{recursive:true});const path=join(dir,j.version+'-'+j.jobId+'.wav'),temporary=path+'.partial';try{await writeFile(temporary,output.bytes);if(j.status==='canceled')return;await rename(temporary,path);if(j.status==='canceled'){await rm(path,{force:true});return;}j.files=[{path,version:j.version,duration:DURATION,channels:2,sampleRate:44100}];j.status='completed';j.progress=1;}finally{await rm(temporary,{force:true});}}catch(e){if(j.status!=='canceled'){j.status='failed';j.error=e.message;}}finally{if(active===j.jobId)active=null;}})();return;
     }
+    if(req.method==='POST'&&path==='/exports'){
+     const b=await body(req),key=b.idempotencyKey;
+     if(typeof key!=='string'||!key||key.length>128)throw error(400,'A bounded idempotency key is required');
+     const sig='exports:'+JSON.stringify(b),prior=keys.get(key);if(prior){if(prior.signature!==sig)throw error(409,'Key belongs to another request');return reply(res,200,publicJob(jobs.get(prior.id)));}
+     const profile=b.profile??'portrait-4k';if(!Object.hasOwn(profiles,profile))throw error(400,'Unknown export profile');
+     if(b.revision!==revision)throw error(409,'Revision conflict');if(active)throw error(409,'A render is already running');if(jobs.size>=100)throw error(429,'Session job limit');
+     const j={jobId:randomUUID(),status:'running',stage:'preparing',progress:0,revision,snapshot:current(),createdAt:new Date().toISOString(),deadline:Date.now()+60*60*1000,files:[]};
+     jobs.set(j.jobId,j);keys.set(key,{signature:sig,id:j.jobId});active=j.jobId;
+     j.timer=setTimeout(()=>{if(!j.published&&!['completed','failed','canceled'].includes(j.status)){j.status='failed';j.error='Export exceeded the 60 minute deadline';j.process?.kill('SIGTERM');void renderer.close();}},60*60*1000);
+     reply(res,202,publicJob(j));
+     void(async()=>{try{await exporter(root,renderer,j,profile);if(j.status==='canceled')throw Error('canceled');j.status='completed';j.stage='complete';j.progress=1;}catch(e){if(j.status!=='canceled'){j.status='failed';j.error=e.message;}j.process?.kill('SIGTERM');for(const p of j.cleanup??[])await rm(p,{recursive:true,force:true}).catch(()=>{});}finally{clearTimeout(j.timer);delete j.process;if(active===j.jobId)active=null;}})();return;
+    }
     const match=path.match(/^\/jobs\/([a-zA-Z0-9-]+)(\/cancel)?$/);
-    if(match){const j=jobs.get(match[1]);if(!j)throw error(404,'Unknown job');if(req.method==='GET'&&!match[2])return reply(res,200,publicJob(j));if(req.method==='POST'&&match[2]){await body(req);if(!['completed','failed','canceled'].includes(j.status))j.status='canceled';return reply(res,200,publicJob(j));}}
+    if(match){const j=jobs.get(match[1]);if(!j)throw error(404,'Unknown job');if(req.method==='GET'&&!match[2])return reply(res,200,publicJob(j));if(req.method==='POST'&&match[2]){await body(req);if(j.committing&&!j.published)throw error(409,'Verified output publication is committing');if(!['completed','failed','canceled'].includes(j.status)&&!j.published){j.status='canceled';j.process?.kill('SIGTERM');if(j.frames)void renderer.close();}return reply(res,200,publicJob(j));}}
     throw error(404,'Unknown endpoint');
    }catch(e){if(!res.headersSent)reply(res,e.code||500,{error:e.message});}
   });

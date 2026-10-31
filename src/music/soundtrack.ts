@@ -1,7 +1,7 @@
 import {DURATION} from '../state.ts';
 import {PERFORMANCE_CUES,sectionEnergyAt} from '../lantern/performance.ts';
 import {CHORDS,MUSIC_VERSION} from './score.ts';
-import {VOICE_PROFILES,glottalWave} from './voices.ts';
+import {CHOIR_SECTIONS,voiceProfile,glottalWave} from './voices.ts';
 
 const SAMPLE_RATE=44100,hz=(midi:number)=>440*2**((midi-69)/12);
 let pending:Promise<AudioBuffer>|undefined;
@@ -26,27 +26,27 @@ async function synthesize(){
  // Six sections × four independent glottal sources, not copies of one organ tone.
  const placements=[-.10,.10,-.72,.72,-.43,.43];
  for(let lane=0;lane<6;lane++){
-  const profile=lane<2?VOICE_PROFILES.bass:lane<4?VOICE_PROFILES.tenor:VOICE_PROFILES.alto;
+  const section=CHOIR_SECTIONS[lane]!,profile=voiceProfile(section);
   for(let singer=0;singer<4;singer++){
    const delay=singer*.018,energy=(t:number)=>sectionEnergyAt(t-delay,lane);
-   const level=c.createGain(),room=outlet(placements[lane]!+(singer-1.5)*.065,lane<2?.43:.70);
-   level.gain.setValueCurveAtTime(curve(t=>2*((lane<2?.027:.034)+energy(t)*(lane<2?.075:.12))),0,total);level.connect(room.input);
-   const o=c.createOscillator(),source=c.createGain(),wave=glottalWave(.62+singer*.012,.21-singer*.004,lane*.31+singer*1.7);
+   const level=c.createGain(),soften=c.createBiquadFilter(),room=outlet(placements[lane]!+(singer-1.5)*.065,lane===0?.40:.70);soften.type='lowpass';soften.frequency.value=section.cutoff;soften.Q.value=.55;
+   level.gain.setValueCurveAtTime(curve(t=>2*section.mix*(.034+energy(t)*.12)),0,total);level.connect(soften).connect(room.input);
+   const o=c.createOscillator(),source=c.createGain(),wave=glottalWave(section.open+singer*.006,section.closing-singer*.003,lane*.31+singer*1.7);
    o.setPeriodicWave(c.createPeriodicWave(wave.real,wave.imag));source.gain.value=.25;
-   pitch(o.frequency,lane,[-7.5,-2.5,2.5,7.5][singer]!);
-   const vibrato=c.createOscillator(),amount=c.createGain();vibrato.frequency.value=(176+lane*4+singer)/DURATION;amount.gain.value=.38+lane*.10;vibrato.connect(amount).connect(o.frequency);vibrato.start(0);vibrato.stop(total);
+   pitch(o.frequency,lane,[-7.5,-2.5,2.5,7.5][singer]!,section.transpose);
+   const vibrato=c.createOscillator(),amount=c.createGain();vibrato.frequency.value=(176+lane*4+singer)/DURATION;amount.gain.value=.28+lane*.055;vibrato.connect(amount).connect(o.frequency);vibrato.start(0);vibrato.stop(total);
    const drift=c.createOscillator(),driftGain=c.createGain();drift.frequency.value=(1+singer%2)/DURATION;driftGain.gain.value=.17;drift.connect(driftGain).connect(o.frequency);drift.start(0);drift.stop(total);
-   const tract=.966+singer*.022+(lane%2)*.012;
-   const averageF0=CHORDS.reduce((sum,h)=>sum+hz(h.notes[lane]!)*h.duration,0)/DURATION;
+   const tract=section.tract*(.976+singer*.016);
+   const averageF0=CHORDS.reduce((sum,h)=>sum+hz(h.notes[lane]!+section.transpose)*h.duration,0)/DURATION;
    for(let band=0;band<5;band++){
     const f=c.createBiquadFilter(),gain=c.createGain();f.type='bandpass';
-    const morph=(t:number)=>Math.min(1,.1+.9*energy(t));
+    const morph=(t:number)=>section.vowelMin+(section.vowelMax-section.vowelMin)*energy(t);
     f.frequency.setValueCurveAtTime(curve(t=>tract*(profile.o.frequency[band]!+(profile.a.frequency[band]!-profile.o.frequency[band]!)*morph(t))),0,total);
     f.Q.setValueCurveAtTime(curve(t=>{const m=morph(t),freq=profile.o.frequency[band]!+(profile.a.frequency[band]!-profile.o.frequency[band]!)*m;const bw=profile.o.bandwidth[band]!+(profile.a.bandwidth[band]!-profile.o.bandwidth[band]!)*m;return freq/(bw*1.70);}),0,total);
     gain.gain.setValueCurveAtTime(curve(t=>{const m=morph(t),db=profile.o.decibels[band]!+(profile.a.decibels[band]!-profile.o.decibels[band]!)*m;return 10**(db/20)*Math.min(20,profile.a.frequency[band]!/averageF0)*.35;}),0,total);
     source.connect(f).connect(gain).connect(level);
    }
-   const chest=c.createBiquadFilter(),body=c.createGain();chest.type='lowpass';chest.frequency.value=320;body.gain.value=lane<2?.025:.012;source.connect(chest).connect(body).connect(level);
+   const chest=c.createBiquadFilter(),body=c.createGain();chest.type='lowpass';chest.frequency.value=320;body.gain.value=section.body;source.connect(chest).connect(body).connect(level);
    o.connect(source);o.start(0);o.stop(total);
   }
  }

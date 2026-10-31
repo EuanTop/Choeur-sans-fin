@@ -19,5 +19,5 @@ export function createWater(scene:T.Scene){
  water.onBeforeRender=function(...args){const hidden:T.Object3D[]=[];scene.traverse(o=>{if(o instanceof T.Mesh&&o.visible&&!Array.isArray(o.material)&&o.material.userData.noReflection){hidden.push(o);o.visible=false;}});try{original.apply(this,args);}finally{hidden.forEach(o=>o.visible=true);}};
  water.name='Single shared water plane';water.rotation.x=-Math.PI/2;water.position.y=.002;
  const material=water.material as T.ShaderMaterial;
- return {mesh:water,update(phase:number,wind:number){material.uniforms.uPhase!.value=phase;material.uniforms.uWind!.value=wind;},resize(w:number,h:number){const s=Math.min(1,1400/Math.max(w,h));water.getRenderTarget().setSize(Math.round(w*s),Math.round(h*s));},dispose(){water.dispose();}};
+ return {mesh:water,update(phase:number,wind:number){material.uniforms.uPhase!.value=phase;material.uniforms.uWind!.value=wind;},resize(w:number,h:number){water.getRenderTarget().setSize(w,h);},dispose(){water.dispose();}};
 }
