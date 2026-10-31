@@ -1,18 +1,21 @@
 import * as T from 'three';
+import {MOUTH,HALL_SCALE} from './proportions.ts';
+import {RATIO} from './cycle.ts';
 import {skinPoint,PUMPKIN} from './pumpkin.ts';
 
 // Hall dimensions, recursive scale and the carved arch share one attachment curve.
 export function mouthSection(y:number){
- const height=T.MathUtils.clamp(y*.276,0,7.15);
- const x=Math.sqrt(Math.max(.8,4.1**2-Math.max(0,height-3.46)**2));
- const margin=.65-.22*T.MathUtils.smoothstep(height,3.4,4.8);
- const width=(x-margin)/(.204*12.2);
+ const spring=MOUTH.bottom+MOUTH.height-MOUTH.width/2;
+ const height=T.MathUtils.clamp(y*HALL_SCALE.y*RATIO,0,MOUTH.bottom+MOUTH.height-.4);
+ const x=Math.sqrt(Math.max(.8,(MOUTH.width/2)**2-Math.max(0,height-spring)**2));
+ const margin=.55-.12*T.MathUtils.smoothstep(height,spring,spring+1.5);
+ const width=(x-margin)/(HALL_SCALE.x*RATIO*12.2);
  const front=(skinPoint(x,height).z-PUMPKIN.thickness+.12+3.6)/.2;
  return {width,front};
 }
 export function fitHallPoint(p:T.Vector3){
  const {width,front}=mouthSection(p.y),w=T.MathUtils.smoothstep(p.z,-12,34);
- const depthBlend=.28+.72*(1-T.MathUtils.smoothstep(p.y*.276,0,1.5));
+ const depthBlend=.28+.72*(1-T.MathUtils.smoothstep(p.y*HALL_SCALE.y*RATIO,0,1.5));
  return new T.Vector3(p.x*(1+w*(width-1)),p.y,p.z+w*((front-34)*depthBlend-1.2));
 }
 export function hallDerivatives(p:T.Vector3){

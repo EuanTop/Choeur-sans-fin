@@ -1,69 +1,78 @@
 import {DURATION} from '../state.ts';
-import {PERFORMANCE_CUES} from '../lantern/performance.ts';
+import {PERFORMANCE_CUES,sectionEnergyAt} from '../lantern/performance.ts';
 import {CHORDS,MUSIC_VERSION} from './score.ts';
+import {VOICE_PROFILES,glottalWave} from './voices.ts';
 
-const SAMPLE_RATE=44100;
-const hz=(midi:number)=>440*2**((midi-69)/12);
+const SAMPLE_RATE=44100,hz=(midi:number)=>440*2**((midi-69)/12);
 let pending:Promise<AudioBuffer>|undefined;
-/** Three identical performances with finite reverb/delay tails; retain the settled middle lap. */
-export function renderSoundtrack(){
- return pending??=synthesize().catch(e=>{pending=undefined;throw e;});
-}
+export function renderSoundtrack(){return pending??=synthesize().catch(e=>{pending=undefined;throw e;});}
+export function cyclePitchCorrection(frequencies:readonly number[],durations:readonly number[]){const cycles=frequencies.reduce((sum,f,i)=>sum+f*durations[i]!,0);return (Math.round(cycles)-cycles)/DURATION;}
+
 async function synthesize(){
- const c=new OfflineAudioContext(2,DURATION*3*SAMPLE_RATE,SAMPLE_RATE);
- const master=c.createGain();master.gain.value=.68;
- const compressor=c.createDynamicsCompressor();compressor.threshold.value=-20;compressor.knee.value=16;compressor.ratio.value=2.2;compressor.attack.value=.024;compressor.release.value=.23;master.connect(compressor).connect(c.destination);
- const reverb=c.createConvolver(),ir=c.createBuffer(2,Math.floor(SAMPLE_RATE*2.8),SAMPLE_RATE);
- let seed=314159;
- const random=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296*2-1;};
- for(let ch=0;ch<2;ch++){const a=ir.getChannelData(ch);let low=0;for(let i=0;i<a.length;i++){const t=i/SAMPLE_RATE;low=.63*low+.37*random();a[i]=low*Math.exp(-t*2.5)*(.25+.75*Math.min(1,t/.06));}}
- reverb.buffer=ir;const wet=c.createGain();wet.gain.value=.23;reverb.connect(wet).connect(master);
- const delayL=c.createDelay(1),delayR=c.createDelay(1);delayL.delayTime.value=1/3;delayR.delayTime.value=2/3;
- for(const [node,pan] of [[delayL,-.65],[delayR,.65]] as const){const g=c.createGain(),p=c.createStereoPanner();g.gain.value=.075;p.pan.value=pan;node.connect(g).connect(p).connect(master);}
- function outlet(pan:number,send=.3){const input=c.createGain(),p=c.createStereoPanner(),dry=c.createGain(),fx=c.createGain();p.pan.value=pan;dry.gain.value=.94;fx.gain.value=send;input.connect(p);p.connect(dry).connect(master);p.connect(fx).connect(reverb);fx.connect(delayL);fx.connect(delayR);return input;}
- function envelope(node:GainNode,start:number,duration:number,gain:number,attack:number,release:number){const g=node.gain;g.setValueAtTime(0,start);g.linearRampToValueAtTime(gain,start+attack);g.setValueAtTime(gain*.83,start+Math.max(attack,duration-release));g.linearRampToValueAtTime(0,start+duration);}
- const organWave=c.createPeriodicWave(new Float32Array(9),new Float32Array([0,1,.22,.50,.10,.16,.04,.035,.02]));
- function organ(note:number,start:number,duration:number,gain:number,pan:number){
-  const o=c.createOscillator(),filter=c.createBiquadFilter(),g=c.createGain();o.setPeriodicWave(organWave);o.frequency.value=hz(note);filter.type='lowpass';filter.frequency.value=note<48?550:2600;filter.Q.value=.4;envelope(g,start,duration,gain,.025,Math.min(.18,duration*.4));o.connect(filter).connect(g).connect(outlet(pan,.22));o.start(start);o.stop(start+duration+.01);
+ const total=DURATION*3,c=new OfflineAudioContext(2,total*SAMPLE_RATE,SAMPLE_RATE),master=c.createGain(),compressor=c.createDynamicsCompressor();
+ master.gain.value=.72;compressor.threshold.value=-16;compressor.knee.value=16;compressor.ratio.value=1.7;compressor.attack.value=.035;compressor.release.value=.4;master.connect(compressor).connect(c.destination);
+ let seed=7919;const random=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296*2-1;};
+ const curve=(f:(time:number)=>number)=>{const v=new Float32Array(total*48+1);for(let i=0;i<v.length;i++)v[i]=f(i/48);return v;};
+ const ir=c.createBuffer(2,Math.round(SAMPLE_RATE*7.2),SAMPLE_RATE);
+ for(let ch=0;ch<2;ch++){const a=ir.getChannelData(ch);let low=0;for(let i=0;i<a.length;i++){const t=i/SAMPLE_RATE;low=.74*low+.26*random();a[i]=low*Math.exp(-t*.80)*Math.min(1,t/.12);}for(const [time,level] of [[.066,.24],[.117,.17],[.194,.12],[.301,.075]])a[Math.round((time!+ch*.013)*SAMPLE_RATE)]!+=level!;}
+ const pre=c.createDelay(.2),reverb=c.createConvolver(),hp=c.createBiquadFilter(),lp=c.createBiquadFilter(),wet=c.createGain();
+ pre.delayTime.value=.035;reverb.buffer=ir;hp.type='highpass';hp.frequency.value=135;lp.type='lowpass';lp.frequency.value=4800;wet.gain.value=.65;pre.connect(reverb).connect(hp).connect(lp).connect(wet).connect(master);
+ function outlet(pan:number,send:number){const input=c.createGain(),p=c.createStereoPanner(),fx=c.createGain();p.pan.value=pan;fx.gain.value=send;input.connect(p).connect(master);p.connect(fx).connect(pre);return {input,panner:p};}
+ function envelope(g:AudioParam,t:number,duration:number,level:number,attack:number,release:number){g.setValueAtTime(0,t);g.linearRampToValueAtTime(level,t+attack);g.setValueAtTime(level*.87,t+Math.max(attack,duration-release));g.linearRampToValueAtTime(0,t+duration);}
+ function pitch(param:AudioParam,lane:number,detune:number,transpose=0){
+  const fs=CHORDS.map(h=>hz(h.notes[lane]!+transpose)*2**(detune/1200)),correction=cyclePitchCorrection(fs,CHORDS.map(h=>h.duration));param.value=fs.at(-1)!+correction;
+  for(let lap=0;lap<3;lap++)CHORDS.forEach((h,i)=>{const t=lap*DURATION+h.time;param.setValueAtTime(fs[(i+fs.length-1)%fs.length]!+correction,t);param.linearRampToValueAtTime(fs[i]!+correction,t+.080);});
  }
- function voice(note:number,start:number,duration:number,gain:number,pan:number,bright=false){
-  const out=c.createGain(),level=c.createGain();envelope(level,start,duration,gain,bright?.09:.32,bright?.28:.48);out.connect(level).connect(outlet(pan,.52));
-  const source=c.createGain();source.gain.value=.45;
-  for(const detune of [-3.5,3.5]){const o=c.createOscillator();o.type='sawtooth';o.frequency.value=hz(note);o.detune.value=detune;o.connect(source);o.start(start);o.stop(start+duration+.01);}
-  // A /ɑ/ vowel bank: a shared breath, rather than a synthetic bell melody.
-  for(const [frequency,q,weight] of [[780,4.8,.72],[1180,6.5,.37],[2750,8,.075]]){const f=c.createBiquadFilter(),g=c.createGain();f.type='bandpass';f.frequency.setValueAtTime(frequency!*(bright?1.06:1),start);f.Q.value=q!;g.gain.value=weight!;source.connect(f).connect(g).connect(out);}
-  const chest=c.createBiquadFilter(),chestGain=c.createGain();chest.type='lowpass';chest.frequency.value=430;chestGain.gain.value=.095;source.connect(chest).connect(chestGain).connect(out);
- }
- function quack(note:number,start:number,side:number){
-  const o=c.createOscillator(),source=c.createGain(),env=c.createGain();o.type='sawtooth';const f=hz(note);o.frequency.setValueAtTime(f*1.10,start);o.frequency.exponentialRampToValueAtTime(f*.82,start+.065);o.frequency.exponentialRampToValueAtTime(f,start+.15);source.gain.value=.44;
-  for(const [a,b,q,gain] of [[850,1120,5.5,.8],[1750,1400,7,.25]]){const filter=c.createBiquadFilter(),g=c.createGain();filter.type='bandpass';filter.frequency.setValueAtTime(a!,start);filter.frequency.exponentialRampToValueAtTime(b!,start+.13);filter.Q.value=q!;g.gain.value=gain!;source.connect(filter).connect(g).connect(env);}
-  envelope(env,start,.17,.32,.012,.085);o.connect(source);env.connect(outlet(side*.16,.32));o.start(start);o.stop(start+.18);
- }
- for(let lap=0;lap<3;lap++){
-  const offset=lap*DURATION;
-  CHORDS.forEach((chord,bar)=>{
-   const t=offset+bar*2,energy=.85+.15*Math.sin(bar/16*Math.PI);
-   chord.notes.forEach((note,i)=>voice(note,t+i*.007,2.42,.10*energy*(i===4?.57:1),-.66+i*.33));
-   // Rounded bass and a light, swung organ pulse leave room for the choir.
-   organ(chord.bass,t+.025,1.12,.23,0);organ(chord.bass+7,t+4/3,.50,.11,0);
-   for(const [beat,velocity] of [[0,.043],[2/3,.024],[5/3,.035]])for(const note of chord.notes.slice(1,4))organ(note,t+beat!+.022,.25,velocity!*energy,Math.sin(bar*.7)*.32);
-  });
-  // One short motif recurs in four harmonic settings; the calls take the gaps.
-  for(let phrase=0;phrase<4;phrase++){
-   const start=phrase*8;
-   const motif=[{t:.25,index:1,d:.55},{t:1,index:2,d:.48},{t:1+2/3,index:3,d:.62},{t:2+2/3,index:2,d:.77}];
-   for(const n of motif){const chord=CHORDS[Math.floor((start+n.t)/2)]!,pitch=chord.notes[n.index]!;organ(pitch,offset+start+n.t,n.d,.092,Math.sin((start+n.t)*Math.PI/16)*.45);}
-  }
-  for(const cue of PERFORMANCE_CUES){
-   quack(cue.note,offset+cue.time,cue.side);quack(cue.note-2,offset+cue.time+.18,cue.side);
-   const chord=CHORDS[Math.floor(cue.time/2)]!;
-   chord.notes.slice(1).forEach((note,i)=>voice(note,offset+cue.time+.50+i*.009,.92,.085,-cue.side*(.18+i*.12),true));
+ // Six sections × four independent glottal sources, not copies of one organ tone.
+ const placements=[-.10,.10,-.72,.72,-.43,.43];
+ for(let lane=0;lane<6;lane++){
+  const profile=lane<2?VOICE_PROFILES.bass:lane<4?VOICE_PROFILES.tenor:VOICE_PROFILES.alto;
+  for(let singer=0;singer<4;singer++){
+   const delay=singer*.018,energy=(t:number)=>sectionEnergyAt(t-delay,lane);
+   const level=c.createGain(),room=outlet(placements[lane]!+(singer-1.5)*.065,lane<2?.43:.70);
+   level.gain.setValueCurveAtTime(curve(t=>2*((lane<2?.027:.034)+energy(t)*(lane<2?.075:.12))),0,total);level.connect(room.input);
+   const o=c.createOscillator(),source=c.createGain(),wave=glottalWave(.62+singer*.012,.21-singer*.004,lane*.31+singer*1.7);
+   o.setPeriodicWave(c.createPeriodicWave(wave.real,wave.imag));source.gain.value=.25;
+   pitch(o.frequency,lane,[-7.5,-2.5,2.5,7.5][singer]!);
+   const vibrato=c.createOscillator(),amount=c.createGain();vibrato.frequency.value=(176+lane*4+singer)/DURATION;amount.gain.value=.38+lane*.10;vibrato.connect(amount).connect(o.frequency);vibrato.start(0);vibrato.stop(total);
+   const drift=c.createOscillator(),driftGain=c.createGain();drift.frequency.value=(1+singer%2)/DURATION;driftGain.gain.value=.17;drift.connect(driftGain).connect(o.frequency);drift.start(0);drift.stop(total);
+   const tract=.966+singer*.022+(lane%2)*.012;
+   const averageF0=CHORDS.reduce((sum,h)=>sum+hz(h.notes[lane]!)*h.duration,0)/DURATION;
+   for(let band=0;band<5;band++){
+    const f=c.createBiquadFilter(),gain=c.createGain();f.type='bandpass';
+    const morph=(t:number)=>Math.min(1,.1+.9*energy(t));
+    f.frequency.setValueCurveAtTime(curve(t=>tract*(profile.o.frequency[band]!+(profile.a.frequency[band]!-profile.o.frequency[band]!)*morph(t))),0,total);
+    f.Q.setValueCurveAtTime(curve(t=>{const m=morph(t),freq=profile.o.frequency[band]!+(profile.a.frequency[band]!-profile.o.frequency[band]!)*m;const bw=profile.o.bandwidth[band]!+(profile.a.bandwidth[band]!-profile.o.bandwidth[band]!)*m;return freq/(bw*1.70);}),0,total);
+    gain.gain.setValueCurveAtTime(curve(t=>{const m=morph(t),db=profile.o.decibels[band]!+(profile.a.decibels[band]!-profile.o.decibels[band]!)*m;return 10**(db/20)*Math.min(20,profile.a.frequency[band]!/averageF0)*.35;}),0,total);
+    source.connect(f).connect(gain).connect(level);
+   }
+   const chest=c.createBiquadFilter(),body=c.createGain();chest.type='lowpass';chest.frequency.value=320;body.gain.value=lane<2?.025:.012;source.connect(chest).connect(body).connect(level);
+   o.connect(source);o.start(0);o.stop(total);
   }
  }
- const raw=await c.startRendering(),result=new AudioBuffer({numberOfChannels:2,length:DURATION*SAMPLE_RATE,sampleRate:SAMPLE_RATE});
- let peak=0;for(let ch=0;ch<2;ch++){const data=raw.getChannelData(ch).subarray(DURATION*SAMPLE_RATE,DURATION*2*SAMPLE_RATE);result.copyToChannel(data,ch);for(const v of data)peak=Math.max(peak,Math.abs(v));}
- const gain=Math.min(2,.86/Math.max(.0001,peak));for(let ch=0;ch<2;ch++){const data=result.getChannelData(ch);for(let i=0;i<data.length;i++)data[i]!*=gain;}
- return result;
+ // A steady, very low organ pedal supplies forward motion without a drum groove.
+ for(const [transpose,gain] of [[0,.012],[-12,.003]]){
+  const o=c.createOscillator(),g=c.createGain();pitch(o.frequency,0,0,transpose!);g.gain.setValueCurveAtTime(curve(t=>gain!*(.89+.11*Math.cos(Math.PI*t))),0,total);o.connect(g).connect(outlet(0,.12).input);o.start(0);o.stop(total);
+ }
+ // Individual breaths at phrase boundaries are quiet; the hall carries the mass.
+ const air=c.createBuffer(1,Math.round(SAMPLE_RATE*.20),SAMPLE_RATE);{const a=air.getChannelData(0);for(let i=0;i<a.length;i++)a[i]=random()*Math.sin(Math.PI*i/a.length)**2;}
+ for(let lap=0;lap<3;lap++)for(let phrase=0;phrase<4;phrase++)for(const side of [-1,1]){
+  const s=c.createBufferSource(),hi=c.createBiquadFilter(),lo=c.createBiquadFilter(),g=c.createGain();s.buffer=air;hi.type='highpass';hi.frequency.value=900;lo.type='lowpass';lo.frequency.value=3700;g.gain.value=.008;s.connect(hi).connect(lo).connect(g).connect(outlet(side*.62,.75).input);s.start(lap*DURATION+phrase*8+.055+(side>0?.025:0));
+ }
+ function bell(time:number){
+  for(const [ratio,gain,decay] of [[.5,.012,5.8],[1,.014,5.1],[1.25,.003,4.3],[1.5,.005,3.8],[2,.002,2.8]]){
+   const o=c.createOscillator(),g=c.createGain();o.frequency.value=hz(50)*ratio!;g.gain.setValueAtTime(0,time);g.gain.linearRampToValueAtTime(gain!,time+.025);g.gain.exponentialRampToValueAtTime(.00001,time+decay!);o.connect(g).connect(outlet(-.34,.80).input);o.start(time);o.stop(time+decay!+.01);
+  }
+ }
+ function quack(note:number,time:number,side:number){
+  const o=c.createOscillator(),source=c.createGain(),env=c.createGain();o.type='sawtooth';source.gain.value=.28;const f=hz(note);o.frequency.setValueAtTime(f*1.025,time);o.frequency.exponentialRampToValueAtTime(f*.98,time+.055);o.frequency.exponentialRampToValueAtTime(f,time+.14);
+  for(const [a,b,q,weight] of [[880,1120,4.5,.73],[1650,1400,6,.21]]){const filter=c.createBiquadFilter(),g=c.createGain();filter.type='bandpass';filter.frequency.setValueAtTime(a!,time);filter.frequency.exponentialRampToValueAtTime(b!,time+.13);filter.Q.value=q!;g.gain.value=weight!;source.connect(filter).connect(g).connect(env);}
+  envelope(env.gain,time,.165,.10,.011,.085);o.connect(source);env.connect(outlet(side*.04,.055).input);o.start(time);o.stop(time+.18);
+ }
+ for(let lap=0;lap<3;lap++){bell(lap*DURATION+.04);bell(lap*DURATION+16.04);for(const cue of PERFORMANCE_CUES){quack(cue.note,lap*DURATION+cue.time,cue.side);quack(cue.reply,lap*DURATION+cue.time+.18,cue.side);}}
+ const raw=await c.startRendering(),result=new AudioBuffer({numberOfChannels:2,length:DURATION*SAMPLE_RATE,sampleRate:SAMPLE_RATE});let peak=0;
+ for(let ch=0;ch<2;ch++){const data=raw.getChannelData(ch).subarray(DURATION*SAMPLE_RATE,DURATION*2*SAMPLE_RATE);result.copyToChannel(data,ch);for(const v of data)peak=Math.max(peak,Math.abs(v));}
+ const gain=Math.min(12,.86/Math.max(.0001,peak));for(let ch=0;ch<2;ch++){const a=result.getChannelData(ch);for(let i=0;i<a.length;i++)a[i]!*=gain;}return result;
 }
 export async function musicWav(){
  const buffer=await renderSoundtrack(),length=buffer.length,bytes=new Uint8Array(44+length*4),v=new DataView(bytes.buffer);

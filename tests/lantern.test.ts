@@ -6,6 +6,7 @@ import {DURATION} from '../src/state.ts';
 import {createPumpkin,skinPoint} from '../src/lantern/pumpkin.ts';
 import {solidRibbon} from '../src/lantern/geometry.ts';
 import {mouthSection,fitHallPoint,hallDerivatives} from '../src/lantern/mouth-fit.ts';
+import {EYES} from '../src/lantern/proportions.ts';
 import {PUMPKIN} from '../src/lantern/pumpkin.ts';
 import {createDuck} from '../src/lantern/duck.ts';
 
@@ -26,7 +27,7 @@ test('pumpkin has a real open mouth, a solid curved shell and finite surface nor
  const cast=(x:number,y:number)=>new T.Raycaster(new T.Vector3(x,y,15),new T.Vector3(0,0,-1),0,30).intersectObject(pumpkin,true);
  assert.equal(cast(0,3.8).length,0,'the mouth must see through the shell, rather than hit an image plane');
  assert.ok(cast(6,4).length>0,'the cheek must remain a solid surface');
- assert.ok(cast(4.25,8.8).length>0,'a recessed light sits behind the eye opening');
+ assert.ok(cast(EYES.x,EYES.y+.45).some(hit=>(hit.object as T.Mesh).material instanceof T.ShaderMaterial),'the smaller inset eye must hit its recessed light, not the cheek');
  pumpkin.traverse(o=>{if(!(o instanceof T.Mesh))return;for(const key of ['position','normal']){const a=o.geometry.attributes[key];assert.ok(a);for(const n of a!.array)assert.ok(Number.isFinite(n),`${key} must stay finite at poles and cut edges`);}});
  for(let y=-1;y<=11;y+=.1)assert.ok(Number.isFinite(skinPoint(0,y).z));
 });
