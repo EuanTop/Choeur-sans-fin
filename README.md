@@ -4,6 +4,8 @@
 <p><b>English</b> · <a href="README.zh-CN.md">简体中文</a></p>
 </div>
 
+Released on 1 November 2026.
+
 A real-time Three.js artwork by @EuanTop. A yellow duck swims through purple light halls nested inside hollow pumpkin lanterns. One duck stays with the camera as the continuous 32-second pullback moves from one scale to the next; swans sing from the curved arcades.
 
 ```sh
