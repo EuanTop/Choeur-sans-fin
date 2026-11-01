@@ -11,12 +11,12 @@ export const VOICE_PROFILES={
 } satisfies Record<string,{a:Vowel;o:Vowel}>;
 /** Sections retain separate musical lines while using different registers and vocal tracts. */
 export const CHOIR_SECTIONS=[
- {name:'Soft male support',family:'male',profile:'tenor',transpose:12,mix:.28,tract:.99,open:.66,closing:.23,vowelMin:.12,vowelMax:.55,cutoff:3000,body:.008},
- {name:'Velvet contralto',family:'female',profile:'alto',transpose:12,mix:.82,tract:.96,open:.66,closing:.24,vowelMin:.18,vowelMax:.64,cutoff:3400,body:.018},
- {name:'Warm alto',family:'female',profile:'alto',transpose:0,mix:1.0,tract:1.0,open:.67,closing:.23,vowelMin:.16,vowelMax:.61,cutoff:3600,body:.016},
- {name:'Round mezzo',family:'female',profile:'mezzo',transpose:0,mix:1.04,tract:1.02,open:.68,closing:.23,vowelMin:.15,vowelMax:.66,cutoff:3700,body:.012},
- {name:'Lyrical soprano',family:'female',profile:'soprano',transpose:0,mix:1.0,tract:.99,open:.65,closing:.24,vowelMin:.20,vowelMax:.73,cutoff:4000,body:.008},
- {name:'Clear soprano',family:'female',profile:'soprano',transpose:0,mix:.90,tract:1.035,open:.62,closing:.23,vowelMin:.26,vowelMax:.82,cutoff:4300,body:.006},
+ {name:'Soft male support',family:'male',profile:'tenor',mix:.28,tract:.99,open:.66,closing:.23,vowelMin:.12,vowelMax:.55,cutoff:3000,body:.008},
+ {name:'Velvet contralto',family:'female',profile:'alto',mix:.82,tract:.96,open:.66,closing:.24,vowelMin:.18,vowelMax:.64,cutoff:3400,body:.018},
+ {name:'Warm alto',family:'female',profile:'alto',mix:1.0,tract:1.0,open:.67,closing:.23,vowelMin:.16,vowelMax:.61,cutoff:3600,body:.016},
+ {name:'Round mezzo',family:'female',profile:'mezzo',mix:1.04,tract:1.02,open:.68,closing:.23,vowelMin:.15,vowelMax:.66,cutoff:3700,body:.012},
+ {name:'Lyrical soprano',family:'female',profile:'soprano',mix:1.0,tract:.99,open:.65,closing:.24,vowelMin:.20,vowelMax:.73,cutoff:4000,body:.008},
+ {name:'Clear soprano',family:'female',profile:'soprano',mix:.90,tract:1.035,open:.62,closing:.23,vowelMin:.26,vowelMax:.82,cutoff:4300,body:.006},
 ] as const;
 function blendVowel(a:Vowel,b:Vowel,weight:number):Vowel{
  const mix=(x:readonly number[],y:readonly number[])=>x.map((v,i)=>v+(y[i]!-v)*weight);

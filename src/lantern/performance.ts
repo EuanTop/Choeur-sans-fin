@@ -1,3 +1,4 @@
+import {vocalActivityAt} from '../music/arrangement.ts';
 import {DURATION} from '../state.ts';
 
 // One score clock drives the duck's gestures and their musical answers.
@@ -25,8 +26,4 @@ export function chorusEnergyAt(time:number){
  return .30+.70*Math.sin(Math.PI*p)**.85;
 }
 
-export function sectionEnergyAt(time:number,section:number){
- const side=section%2===0?-1:1,delay=(section%2)*.055+Math.floor(section/2)*.035;
- const antiphon=section<2?1:.88+.12*Math.sin(2*Math.PI*time/16+side*Math.PI/2);
- return Math.min(1,chorusEnergyAt(time-delay)*antiphon);
-}
+export function sectionEnergyAt(time:number,section:number){return vocalActivityAt(time,section);}

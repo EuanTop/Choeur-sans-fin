@@ -32,7 +32,7 @@ export async function createArtwork(){
   render(time:number,w:number,h:number,state:ArtState){
    const start=performance.now();lastTime=time;renderer.info.reset();renderer.shadowMap.needsUpdate=true;
    if(w!==width||h!==height){width=w;height=h;renderer.setSize(w,h,false);composer.setSize(w,h);aa.uniforms.resolution!.value.set(1/w,1/h);water.resize(w,h);}
-   setDetailViewport(h);passenger.update(time,state.motion);wake.update(time,state.motion);const zoom=world.update(time,state.motion);phase.value=zoom.u*TAU;water.update(phase.value,state.wind);lighting.update(time,state.light);
+   setDetailViewport(h);passenger.update(time,state.motion);wake.update(time,state.motion);const zoom=world.update(time,state.motion,state.choirVariation);phase.value=zoom.u*TAU;water.update(phase.value,state.wind);lighting.update(time,state.light);
    const angle=T.MathUtils.degToRad(state.camera*.25);camera.position.set(.5,6,30).applyAxisAngle(new T.Vector3(0,1,0),angle);camera.lookAt(0,4.5,-4);
    camera.aspect=w/h;camera.updateProjectionMatrix();camera.updateMatrixWorld(true);composer.render(0);
    if(errors.length)throw Error('GLSL compilation failed: '+errors.join('\n'));

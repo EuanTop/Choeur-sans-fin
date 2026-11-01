@@ -3,8 +3,8 @@ import {HALL_SCALE} from './proportions.ts';
 import {createHall} from './hall.ts';
 import {createPumpkin} from './pumpkin.ts';
 import {phase} from './materials.ts';
-import {choirMotion,choirEnergy,choirSections,type SwanParts} from './choir.ts';
-import {chorusEnergyAt,sectionEnergyAt} from './performance.ts';
+import {choirMotion,choirVariation,choirSections,type SwanParts} from './choir.ts';
+import {sectionEnergyAt} from './performance.ts';
 import {LEVELS,levelPose,zoomPose} from './cycle.ts';
 
 export function createNestedWorld(scene:T.Scene,parts:SwanParts){
@@ -18,8 +18,8 @@ export function createNestedWorld(scene:T.Scene,parts:SwanParts){
   group.add(instance,pumpkin.clone(true));
   return {index,group,scale:pose.scale,clip};
  });
- return {root,levels,update(time:number,motion:number){
-  choirMotion.value=motion;choirEnergy.value=chorusEnergyAt(time);for(let i=0;i<6;i++)choirSections.value[i]=sectionEnergyAt(time,i);const zoom=zoomPose(time);root.position.copy(zoom.position);root.scale.setScalar(zoom.scale);
+ return {root,levels,update(time:number,motion:number,variation=1){
+  choirMotion.value=motion;choirVariation.value=variation;for(let i=0;i<6;i++)choirSections.value[i]=sectionEnergyAt(time,i);const zoom=zoomPose(time);root.position.copy(zoom.position);root.scale.setScalar(zoom.scale);
   for(const l of levels){const s=l.scale*zoom.scale;l.group.visible=s<=6&&s>=.003;}
   root.updateMatrixWorld(true);for(const l of levels)l.clip.set(new T.Vector3(0,0,-1),35.2).applyMatrix4(l.group.matrixWorld);return zoom;
  }};

@@ -1,6 +1,7 @@
 import {DURATION} from '../state.ts';
 import {PERFORMANCE_CUES,sectionEnergyAt} from '../lantern/performance.ts';
 import {CHORDS,MUSIC_VERSION} from './score.ts';
+import {vocalPitchTimeline,roleAt} from './arrangement.ts';
 import {CHOIR_SECTIONS,voiceProfile,glottalWave} from './voices.ts';
 
 const SAMPLE_RATE=44100,hz=(midi:number)=>440*2**((midi-69)/12);
@@ -17,27 +18,28 @@ async function synthesize(){
  for(let ch=0;ch<2;ch++){const a=ir.getChannelData(ch);let low=0;for(let i=0;i<a.length;i++){const t=i/SAMPLE_RATE;low=.74*low+.26*random();a[i]=low*Math.exp(-t*.80)*Math.min(1,t/.12);}for(const [time,level] of [[.066,.24],[.117,.17],[.194,.12],[.301,.075]])a[Math.round((time!+ch*.013)*SAMPLE_RATE)]!+=level!;}
  const pre=c.createDelay(.2),reverb=c.createConvolver(),hp=c.createBiquadFilter(),lp=c.createBiquadFilter(),wet=c.createGain();
  pre.delayTime.value=.035;reverb.buffer=ir;hp.type='highpass';hp.frequency.value=135;lp.type='lowpass';lp.frequency.value=4800;wet.gain.value=.65;pre.connect(reverb).connect(hp).connect(lp).connect(wet).connect(master);
- function outlet(pan:number,send:number){const input=c.createGain(),p=c.createStereoPanner(),fx=c.createGain();p.pan.value=pan;fx.gain.value=send;input.connect(p).connect(master);p.connect(fx).connect(pre);return {input,panner:p};}
+ function outlet(pan:number,send:number){const input=c.createGain(),p=c.createStereoPanner(),fx=c.createGain();p.pan.value=pan;fx.gain.value=send;input.connect(p).connect(master);p.connect(fx).connect(pre);return {input,panner:p,send:fx};}
  function envelope(g:AudioParam,t:number,duration:number,level:number,attack:number,release:number){g.setValueAtTime(0,t);g.linearRampToValueAtTime(level,t+attack);g.setValueAtTime(level*.87,t+Math.max(attack,duration-release));g.linearRampToValueAtTime(0,t+duration);}
- function pitch(param:AudioParam,lane:number,detune:number,transpose=0){
-  const fs=CHORDS.map(h=>hz(h.notes[lane]!+transpose)*2**(detune/1200)),correction=cyclePitchCorrection(fs,CHORDS.map(h=>h.duration));param.value=fs.at(-1)!+correction;
-  for(let lap=0;lap<3;lap++)CHORDS.forEach((h,i)=>{const t=lap*DURATION+h.time;param.setValueAtTime(fs[(i+fs.length-1)%fs.length]!+correction,t);param.linearRampToValueAtTime(fs[i]!+correction,t+.080);});
+ function pitch(param:AudioParam,line:readonly {time:number;duration:number;midi:number}[],detune:number){
+  const fs=line.map(h=>hz(h.midi)*2**(detune/1200)),correction=cyclePitchCorrection(fs,line.map(h=>h.duration));param.value=fs.at(-1)!+correction;
+  for(let lap=0;lap<3;lap++)line.forEach((h,i)=>{const t=lap*DURATION+h.time;param.setValueAtTime(fs[(i+fs.length-1)%fs.length]!+correction,t);param.linearRampToValueAtTime(fs[i]!+correction,t+.080);});
  }
  // Six sections × four independent glottal sources, not copies of one organ tone.
  const placements=[-.10,.10,-.72,.72,-.43,.43];
  for(let lane=0;lane<6;lane++){
-  const section=CHOIR_SECTIONS[lane]!,profile=voiceProfile(section);
+  const section=CHOIR_SECTIONS[lane]!,profile=voiceProfile(section),line=vocalPitchTimeline(lane);
   for(let singer=0;singer<4;singer++){
    const delay=singer*.018,energy=(t:number)=>sectionEnergyAt(t-delay,lane);
    const level=c.createGain(),soften=c.createBiquadFilter(),room=outlet(placements[lane]!+(singer-1.5)*.065,lane===0?.40:.70);soften.type='lowpass';soften.frequency.value=section.cutoff;soften.Q.value=.55;
-   level.gain.setValueCurveAtTime(curve(t=>2*section.mix*(.034+energy(t)*.12)),0,total);level.connect(soften).connect(room.input);
+   level.gain.setValueCurveAtTime(curve(t=>section.mix*energy(t)*.40),0,total);level.connect(soften).connect(room.input);
+   room.send.gain.setValueCurveAtTime(curve(t=>{const role=roleAt(t-delay,lane);return lane===0?.35:role==='lead'?.36:role==='co-lead'?.44:role==='response'?.48:.70;}),0,total);
    const o=c.createOscillator(),source=c.createGain(),wave=glottalWave(section.open+singer*.006,section.closing-singer*.003,lane*.31+singer*1.7);
    o.setPeriodicWave(c.createPeriodicWave(wave.real,wave.imag));source.gain.value=.25;
-   pitch(o.frequency,lane,[-7.5,-2.5,2.5,7.5][singer]!,section.transpose);
+   pitch(o.frequency,line,[-7.5,-2.5,2.5,7.5][singer]!);
    const vibrato=c.createOscillator(),amount=c.createGain();vibrato.frequency.value=(176+lane*4+singer)/DURATION;amount.gain.value=.28+lane*.055;vibrato.connect(amount).connect(o.frequency);vibrato.start(0);vibrato.stop(total);
    const drift=c.createOscillator(),driftGain=c.createGain();drift.frequency.value=(1+singer%2)/DURATION;driftGain.gain.value=.17;drift.connect(driftGain).connect(o.frequency);drift.start(0);drift.stop(total);
    const tract=section.tract*(.976+singer*.016);
-   const averageF0=CHORDS.reduce((sum,h)=>sum+hz(h.notes[lane]!+section.transpose)*h.duration,0)/DURATION;
+   const averageF0=line.reduce((sum,h)=>sum+hz(h.midi)*h.duration,0)/DURATION;
    for(let band=0;band<5;band++){
     const f=c.createBiquadFilter(),gain=c.createGain();f.type='bandpass';
     const morph=(t:number)=>section.vowelMin+(section.vowelMax-section.vowelMin)*energy(t);
@@ -52,7 +54,7 @@ async function synthesize(){
  }
  // A steady, very low organ pedal supplies forward motion without a drum groove.
  for(const [transpose,gain] of [[0,.012],[-12,.003]]){
-  const o=c.createOscillator(),g=c.createGain();pitch(o.frequency,0,0,transpose!);g.gain.setValueCurveAtTime(curve(t=>gain!*(.89+.11*Math.cos(Math.PI*t))),0,total);o.connect(g).connect(outlet(0,.12).input);o.start(0);o.stop(total);
+  const o=c.createOscillator(),g=c.createGain();pitch(o.frequency,CHORDS.map(h=>({time:h.time,duration:h.duration,midi:h.bass+transpose!})),0);g.gain.setValueCurveAtTime(curve(t=>gain!*(.89+.11*Math.cos(Math.PI*t))),0,total);o.connect(g).connect(outlet(0,.12).input);o.start(0);o.stop(total);
  }
  // Individual breaths at phrase boundaries are quiet; the hall carries the mass.
  const air=c.createBuffer(1,Math.round(SAMPLE_RATE*.20),SAMPLE_RATE);{const a=air.getChannelData(0);for(let i=0;i<a.length;i++)a[i]=random()*Math.sin(Math.PI*i/a.length)**2;}
@@ -86,6 +88,7 @@ export function createMusicPlayer(){
  let context:AudioContext|undefined,buffer:AudioBuffer|undefined,source:AudioBufferSourceNode|undefined,startTime=0,offset=0,lastScene=0;
  const stop=()=>{source?.stop();source?.disconnect();source=undefined;};
  return {
+  isReady(){return Boolean(context&&context.state==='running'&&buffer);},
   async unlock(){context??=new AudioContext();await context.resume();if(!buffer){try{const response=await fetch('/__art/music/audio');if(!response.ok||response.headers.get('X-Music-Version')!==MUSIC_VERSION)throw Error('No current cached music');buffer=await context.decodeAudioData(await response.arrayBuffer());}catch{buffer=await renderSoundtrack();}}},
   update(time:number,paused:boolean,enabled:boolean){lastScene=time;if(!context||!buffer||context.state!=='running')return;if(paused||!enabled){stop();return;}
    const playhead=source?(offset+context.currentTime-startTime)%DURATION:-1;

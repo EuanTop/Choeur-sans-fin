@@ -3,12 +3,13 @@ import {arch,batch} from './geometry.ts';
 import {MOUTH,EYES} from './proportions.ts';
 import {plaster,luminous,lightField} from './materials.ts';
 
-export const PUMPKIN={radius:8,height:6,centreY:5,depth:4.5,thickness:1.0};
+export const PUMPKIN={radius:8,height:6.4,centreY:5,depth:4.5,thickness:1.0};
 /** One continuous lobed surface for both shell halves, with a recessed crown. */
 function pumpkinSurface(x:number,y:number,z:number){
  const phi=Math.atan2(x,z),radial=Math.hypot(x,z);
- const rib=(1+.080*Math.cos(phi*8)-.010*Math.cos(phi*16))*(1-.025*y*y);
- const crown=.58*Math.exp(-radial*radial/.10)*T.MathUtils.smoothstep(y,.30,.94);
+ const groove=Math.pow(.5-.5*Math.cos(phi*8),4);
+ const rib=(1+.115*Math.cos(phi*8)-.065*groove)*(1-.045*y*y);
+ const crown=.78*Math.exp(-radial*radial/.10)*T.MathUtils.smoothstep(y,.30,.94);
  const base=.12*Math.exp(-radial*radial/.12)*(1-T.MathUtils.smoothstep(y,-.94,-.35));
  return new T.Vector3(x*PUMPKIN.radius*rib,PUMPKIN.centreY+y*PUMPKIN.height-crown+base,z*PUMPKIN.depth*rib);
 }
@@ -55,22 +56,25 @@ function cutWalls(){
 /** A real hollow, ribbed shell with open eyes and mouth; no portal image texture. */
 export function createPumpkin(){
  const root=new T.Group();root.name='Hollow pumpkin / architectural threshold';
- const skin=plaster('#c26a25',.61);
- const pigment=skin.onBeforeCompile;skin.onBeforeCompile=function(s,r){pigment.call(this,s,r);s.fragmentShader=s.fragmentShader.replace('*.012','*.0025').replace('*.004*fine','*.0008*fine');s.fragmentShader=s.fragmentShader.replace('#include <opaque_fragment>',`float spring=${MOUTH.bottom+MOUTH.height-MOUTH.width/2};float radius=${MOUTH.width/2};float mouthEdge=vObject.y<spring?abs(abs(vObject.x)-radius):abs(length(vec2(vObject.x,vObject.y-spring))-radius);float glow=exp(-mouthEdge*10.)*smoothstep(-.2,.9,vObject.y);outgoingLight+=vec3(1.15,.34,.045)*glow*.35;
- #include <opaque_fragment>`);};skin.customProgramCacheKey=()=> 'pumpkin-rim-v4';skin.emissive.set('#8c2f08');skin.emissiveIntensity=.035;
+ const skin=plaster('#c26a25',.70);
+ const pigment=skin.onBeforeCompile;skin.onBeforeCompile=function(s,r){pigment.call(this,s,r);s.fragmentShader=s.fragmentShader.replace('*.012','*.0025').replace('*.004*fine','*.0008*fine');s.fragmentShader=s.fragmentShader.replace('#include <color_fragment>',`#include <color_fragment>
+ float rindAngle=atan(vObject.x/8.,vObject.z/4.5);float furrow=pow(.5-.5*cos(rindAngle*8.),4.);diffuseColor.rgb*=1.-furrow*.12;`);s.fragmentShader=s.fragmentShader.replace('#include <opaque_fragment>',`float spring=${MOUTH.bottom+MOUTH.height-MOUTH.width/2};float radius=${MOUTH.width/2};float mouthEdge=vObject.y<spring?abs(abs(vObject.x)-radius):abs(length(vec2(vObject.x,vObject.y-spring))-radius);float glow=exp(-mouthEdge*10.)*smoothstep(-.2,.9,vObject.y);outgoingLight+=vec3(1.15,.34,.045)*glow*.35;
+ #include <opaque_fragment>`);};skin.customProgramCacheKey=()=> 'pumpkin-rim-v6';skin.emissive.set('#8c2f08');skin.emissiveIntensity=.035;
  const inside=plaster('#f5a04e');inside.emissive.set('#ff9c35');inside.emissiveIntensity=.38;inside.side=T.DoubleSide;
  const edge=luminous('#ffaf57',.60);edge.side=T.DoubleSide;
  const front=new T.Mesh(frontGeometry(),skin);front.castShadow=true;front.receiveShadow=false;root.add(front);
  const lining=new T.Mesh(frontGeometry(true),inside);root.add(lining);
  const walls=new T.Mesh(cutWalls(),edge);root.add(walls);
  const eyeGlow=lightField('#ffca76','#ee7c2c',1.6);
- for(const side of [-1,1]){const g=new T.ShapeGeometry(eye(side),32),p=g.attributes.position!,uv=g.attributes.uv!;for(let i=0;i<p.count;i++){const x=p.getX(i),y=p.getY(i),v=skinPoint(x,y);p.setXYZ(i,v.x,v.y,v.z-PUMPKIN.thickness-.18);uv.setXY(i,(x-side*EYES.x)/EYES.width+.5,(y-EYES.y)/EYES.height);}g.computeVertexNormals();root.add(new T.Mesh(g,eyeGlow));}
+ // A diffuser sits behind the entire curved aperture. Bending a coarse light
+ // mesh onto the rind can put its triangles through the cheek at deep furrows.
+ for(const side of [-1,1]){const glow=new T.Mesh(new T.PlaneGeometry(EYES.width*1.45,EYES.height*1.6),eyeGlow);glow.position.set(side*EYES.x,EYES.y+EYES.height*.46,.70);root.add(glow);}
  const backGeo=new T.SphereGeometry(1,112,64,Math.PI,Math.PI);
  const p=backGeo.attributes.position!;
  for(let i=0;i<p.count;i++){const v=pumpkinSurface(p.getX(i),p.getY(i),p.getZ(i));p.setXYZ(i,v.x,v.y,v.z);}backGeo.computeVertexNormals();
  const back=new T.Mesh(backGeo,skin);back.castShadow=false;back.receiveShadow=true;root.add(back);
  // A short tapered, fluted stalk grows out of the indented crown.
- const stemCurve=new T.CatmullRomCurve3([new T.Vector3(0,10.38,0),new T.Vector3(.12,10.95,.04),new T.Vector3(.31,11.65,.13),new T.Vector3(.30,12.12,.25)]);
+ const stemCurve=new T.CatmullRomCurve3([new T.Vector3(0,10.55,0),new T.Vector3(.16,11.35,.04),new T.Vector3(.74,12.10,.13),new T.Vector3(1.02,12.32,.25)]);
  const tubularSegments=48,radialSegments=24,stemGeo=new T.TubeGeometry(stemCurve,tubularSegments,1,radialSegments,false),st=stemGeo.attributes.position!;
  for(let i=0;i<=tubularSegments;i++){
   const t=i/tubularSegments,centre=stemCurve.getPointAt(t),radius=.64*(1-.46*t)+.20*Math.exp(-t*18);

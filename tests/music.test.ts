@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {CHOIR_SECTIONS} from '../src/music/voices.ts';
+import {CHOIR_PARTS,vocalPitchTimeline,vocalActivityAt,roleAt} from '../src/music/arrangement.ts';
 import {CHORDS,harmonyAt} from '../src/music/score.ts';
 import {cyclePitchCorrection} from '../src/music/soundtrack.ts';
 import {PERFORMANCE_CUES,chorusEnergyAt,sectionEnergyAt} from '../src/lantern/performance.ts';
@@ -28,13 +28,34 @@ test('continuous choir lines move by small intervals and return to the opening v
 });
 test('persistent voices close their oscillator phase without an audible tuning change',()=>{
  for(let lane=0;lane<6;lane++)for(const detune of [-5.5,0,5.8]){
-  const frequencies=CHORDS.map(h=>440*2**((h.notes[lane]!+CHOIR_SECTIONS[lane]!.transpose-69)/12)*2**(detune/1200));
-  const correction=cyclePitchCorrection(frequencies,CHORDS.map(h=>h.duration));
-  const cycles=frequencies.reduce((s,f,i)=>s+(f+correction)*CHORDS[i]!.duration,0);
+  const line=vocalPitchTimeline(lane),frequencies=line.map(h=>440*2**((h.midi-69)/12)*2**(detune/1200));
+  const correction=cyclePitchCorrection(frequencies,line.map(h=>h.duration));
+  const cycles=frequencies.reduce((s,f,i)=>s+(f+correction)*line[i]!.duration,0);
   assert.ok(Math.abs(cycles-Math.round(cycles))<1e-8);
   assert.ok(frequencies.every(f=>Math.abs(1200*Math.log2((f+correction)/f))<.65));
  }
  for(const cue of PERFORMANCE_CUES){assert.ok(chorusEnergyAt(cue.time)>.99);assert.ok(chorusEnergyAt(cue.time+4)<.31);}
- for(let t=0;t<32;t+=.1)for(let section=0;section<6;section++){const energy=sectionEnergyAt(t,section);assert.ok(energy>0&&energy<=1);assert.ok(Math.abs(energy-sectionEnergyAt(t+32,section))<1e-9);}
+ for(let t=0;t<32;t+=.1)for(let section=0;section<6;section++){const energy=sectionEnergyAt(t,section);assert.ok(energy>=0&&energy<=1);assert.ok(Math.abs(energy-sectionEnergyAt(t+32,section))<1e-9);}
  assert.ok(Math.abs(chorusEnergyAt(32-.0001)-chorusEnergyAt(.0001))<.001);
+});
+
+test('independent vocal parts keep their own rhythm, resolve passing notes and trade the lead',()=>{
+ const ids=new Set<string>();
+ for(const [section,notes] of CHOIR_PARTS.entries()){
+  const line=vocalPitchTimeline(section);assert.equal(line.reduce((s,n)=>s+n.duration,0),DURATION);
+  for(const [i,n] of notes.entries()){
+   assert.ok(!ids.has(n.id));ids.add(n.id);assert.ok(n.duration>0&&n.time>=0&&n.time<DURATION);
+   assert.ok(n.midi>=48&&n.midi<=76,'keep the intended vocal tessitura');
+   assert.ok(Math.abs(n.time*4-Math.round(n.time*4))<1e-8,'entries share a quarter-second subdivision');
+   const next=notes[(i+1)%notes.length]!,nextTime=next.time+(i===notes.length-1?DURATION:0);
+   assert.ok(n.time+n.duration<=nextTime+.00001,'a section must not sing two notes at once, including across the loop');
+   if(n.passing){assert.ok(n.duration<=1);assert.ok(Math.abs(n.midi-next.midi)<=2,'a passing dissonance must resolve by step');}
+   else for(let t=n.time;t<n.time+n.duration;t+=.20){const h=harmonyAt(t),pcs=new Set([...h.notes,h.bass].map(p=>p%12));assert.ok(pcs.has(n.midi%12),`${n.id} must fit ${h.name} at ${t}`);}
+  }
+ }
+ const rhythms=CHOIR_PARTS.map(part=>part.map(n=>n.time).join(','));assert.equal(new Set(rhythms).size,6,'the parts must not share one block-chord rhythm');
+ assert.equal(roleAt(2,2),'lead');assert.equal(roleAt(10,3),'lead');assert.equal(roleAt(22,4),'lead');assert.equal(roleAt(26,3),'co-lead');assert.equal(roleAt(26,5),'co-lead');
+ const at=(part:number,time:number)=>CHOIR_PARTS[part]!.find(n=>time>=n.time&&time<n.time+n.duration)!.midi;
+ assert.ok(at(2,5.8)<at(2,4.6)&&at(4,5.8)>at(4,4.6),'the descending call and ascending response must include contrary motion');
+ for(const part of [0,4,5]){assert.ok(vocalActivityAt(0,part)>0,'sustained voices carry across the loop');assert.ok(Math.abs(vocalActivityAt(32-.00001,part)-vocalActivityAt(.00001,part))<.001);}
 });
