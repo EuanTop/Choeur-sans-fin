@@ -16,8 +16,8 @@ async function run(j,args){
  const p=spawn(ffmpeg,args,{stdio:['ignore','ignore','pipe']});processFor(j,p);let log='';p.stderr.on('data',b=>log=(log+b).slice(-5000));
  const [code]=await once(p,'close');if(code!==0)throw Error('Encoder failed: '+log);checkJob(j);
 }
-async function cachedAudio(root,voice){
- const version=musicVersionFor(voice);
+async function cachedAudio(root,voice,level){
+ const version=musicVersionFor(voice,level);
  const dir=join(root,'artifacts/audio');const files=await readdir(dir);
  const candidates=await Promise.all(files.filter(f=>f.startsWith(version+'-')&&f.endsWith('.wav')).map(async f=>({path:join(dir,f),info:await stat(join(dir,f))})));
  candidates.sort((a,b)=>b.info.mtimeMs-a.info.mtimeMs);return candidates.find(f=>f.info.size===44+DURATION*44100*4)?.path;
@@ -28,8 +28,8 @@ export async function video(root,renderer,j,profile){
  if(Number(disk.bavail)*Number(disk.bsize)<8*1024**3)throw Error('At least 8 GiB free output storage required');
  const exports=join(root,'artifacts/exports'),dir=join(exports,'.job-'+j.jobId);
  await mkdir(dir,{recursive:true});j.cleanup=[dir];j.stage='preparing music';
- const wav=join(dir,'source-audio.wav'),cached=await cachedAudio(root,j.snapshot.voice).catch(()=>undefined);
- if(cached)await copyFile(cached,wav);else{const a=await renderer.audio(j.snapshot);checkJob(j);if(a.version!==musicVersionFor(j.snapshot.voice))throw Error('Music version changed');await writeFile(wav,a.bytes);}
+ const wav=join(dir,'source-audio.wav'),cached=await cachedAudio(root,j.snapshot.voice,j.snapshot.poemVolume).catch(()=>undefined);
+ if(cached)await copyFile(cached,wav);else{const a=await renderer.audio(j.snapshot);checkJob(j);if(a.version!==musicVersionFor(j.snapshot.voice,j.snapshot.poemVolume))throw Error('Music version changed');await writeFile(wav,a.bytes);}
  checkJob(j);const master=join(dir,'master.mkv'),share=join(dir,'share.mp4');
  const stamp=await renderer.sourceStamp();j.stage='rendering frames';j.width=width;j.height=height;j.frames=FRAMES;j.frame=0;
  const p=spawn(ffmpeg,['-hide_banner','-loglevel','error','-y','-threads','4','-f','image2pipe','-vcodec','png','-framerate',String(FPS),'-i','pipe:0','-i',wav,'-map','0:v:0','-map','1:a:0','-frames:v',String(FRAMES),'-c:v','ffv1','-level','3','-coder','1','-context','1','-pix_fmt','gbrp','-threads','4','-c:a','pcm_s16le','-t',String(DURATION),master],{stdio:['pipe','ignore','pipe']});
@@ -51,7 +51,7 @@ export async function video(root,renderer,j,profile){
  const common=['-hide_banner','-loglevel','error','-y','-i',master];
  try{await run(j,[...common,'-c:v','hevc_videotoolbox','-q:v','80','-tag:v','hvc1','-pix_fmt','yuv420p','-g','30','-c:a','aac','-b:a','256k','-movflags','+faststart',share]);}
  catch(e){checkJob(j);await run(j,[...common,'-c:v','libx265','-preset','medium','-crf','17','-x265-params','pools=4:frame-threads=2:log-level=error','-tag:v','hvc1','-pix_fmt','yuv420p','-g','30','-c:a','aac','-b:a','256k','-movflags','+faststart',share]);}
- const manifest={project:'Endless Chorus',duration:DURATION,fps:FPS,frames:FRAMES,width,height,revision:j.revision,snapshot:j.snapshot,sourceStamp:stamp,sourceFrames,sourceFramesDirectory:'source-frames',createdAt:j.createdAt,music:musicVersionFor(j.snapshot.voice)};
+ const manifest={project:'Endless Chorus',duration:DURATION,fps:FPS,frames:FRAMES,width,height,revision:j.revision,snapshot:j.snapshot,sourceStamp:stamp,sourceFrames,sourceFramesDirectory:'source-frames',createdAt:j.createdAt,music:musicVersionFor(j.snapshot.voice,j.snapshot.poemVolume)};
  await writeFile(join(dir,'manifest.json'),JSON.stringify(manifest,null,2));j.stage='verifying complete decode, RGB and PCM';j.progress=.90;
  await verify(dir,'master.mkv','share.mp4',true,p=>processFor(j,p));checkJob(j);
  j.committing=true;j.stage='finalizing verified files';

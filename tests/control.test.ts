@@ -63,5 +63,11 @@ test('local control: atomic state, exact pause clock, Origin guards, capture lif
   r=await request('PATCH','/state',{expectedRevision:3,patch:{voice:'Voice C'}});assert.equal(r.status,200);
   assert.equal((await request('GET','/music/score')).body.voice,'Voice C');
   assert.equal((await request('POST','/music/render',{revision:4,version:a.version,idempotencyKey:'wrong-take'})).status,409);
+  const before=(await request('GET','/music/score')).body.version;
+  assert.equal((await request('PATCH','/state',{expectedRevision:4,patch:{poemVolume:3.01}})).status,400);
+  assert.equal((await request('PATCH','/state',{expectedRevision:4,patch:{poemVolume:1.8}})).status,200);
+  const after=(await request('GET','/music/score')).body;assert.notEqual(after.version,before);assert.equal(after.poemVolume,1.8);
+  assert.equal((await request('GET','/music/score?volume=0')).body.poemVolume,0);
+  assert.equal((await request('GET','/music/score?volume=4')).status,400);
  }finally{await rm(root,{recursive:true,force:true});}
 });

@@ -3,7 +3,7 @@ import {takeFor,cuesFor} from './poem.ts';
 import {hallImpulse} from './hall.ts';
 
 /** The orchestra stays at unity; speech becomes a distant part of its acoustic field. */
-export async function mixSpokenPoem(music:AudioBuffer,voiceName:string){
+export async function renderSpokenPoem(music:AudioBuffer,voiceName:string){
  const sr=music.sampleRate,total=DURATION*3,c=new OfflineAudioContext(2,total*sr,sr),take=takeFor(voiceName),cues=cuesFor(voiceName);
  const response=await fetch(take.url);if(!response.ok)throw Error('The French recording is missing: '+take.url);
  const bytes=await response.arrayBuffer();
@@ -39,11 +39,10 @@ export async function mixSpokenPoem(music:AudioBuffer,voiceName:string){
    speechEnergy+=speech[i]!**2;musicEnergy+=score[i]!**2;
   }
  }
- const speechGain=.52*Math.sqrt(musicEnergy/Math.max(1e-10,speechEnergy));let peak=0;
+ const speechGain=.52*Math.sqrt(musicEnergy/Math.max(1e-10,speechEnergy));
  for(let ch=0;ch<2;ch++){
-  const speech=raw.getChannelData(ch).subarray(DURATION*sr,DURATION*2*sr),score=music.getChannelData(ch),out=result.getChannelData(ch);
-  for(let i=0;i<out.length;i++){out[i]=score[i]!+speech[i]!*speechGain;peak=Math.max(peak,Math.abs(out[i]!));}
+  const speech=raw.getChannelData(ch).subarray(DURATION*sr,DURATION*2*sr),out=result.getChannelData(ch);
+  for(let i=0;i<out.length;i++)out[i]=speech[i]!*speechGain;
  }
- const gain=Math.min(1,.96/Math.max(peak,.001));for(let ch=0;ch<2;ch++){const a=result.getChannelData(ch);for(let i=0;i<a.length;i++)a[i]!*=gain;}
  return result;
 }

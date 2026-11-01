@@ -1,5 +1,5 @@
 <div align="center">
-<h1>Endless Chorus</h1>
+<h1>Chœur sans fin</h1>
 <p>A world inside a pumpkin. Another lantern inside that world.</p>
 <p><b>English</b> · <a href="README.zh-CN.md">简体中文</a></p>
 </div>
@@ -11,7 +11,7 @@ npm ci
 npm run dev
 ```
 
-Open `http://127.0.0.1:5176/`. Default framing is 3:4 portrait, with a deep violet palette and animated analog grain. Both the palette and grain can be changed in the panel. The collapsible panel controls time, swimming, water movement, light and viewpoint, with PNG capture. Enable music in the panel to hear the original synthesized choir and organ score. Side glances and wing gestures share its cue times. A supplied French reading is placed between choral phrases, with poetry fading on the river surface ahead of the duck. Choose Voice A / B / C in the panel. The panel and `npm run export` share a frame-accurate 4K export job, producing HEVC/AAC MP4 and an FFV1 RGB/PCM lossless master.
+Open `http://127.0.0.1:5176/`. Default framing is 3:4 portrait, with a deep violet palette and animated analog grain. Both the palette and grain can be changed in the panel. The collapsible panel controls time, swimming, water movement, light and viewpoint, with PNG capture. Enable music in the panel to hear the original synthesized choir and organ score. Side glances and wing gestures share its cue times. A supplied French reading is placed between choral phrases, with poetry fading on the river surface ahead of the duck. Choose Voice A / B / C and adjust Poem volume independently in the panel; Voice B at 222% is the default. The panel and `npm run export` share a frame-accurate 4K export job, producing HEVC/AAC MP4 and an FFV1 RGB/PCM lossless master.
 
 ```sh
 npm test

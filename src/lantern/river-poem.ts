@@ -20,7 +20,7 @@ export function createRiverPoem(renderer:T.WebGLRenderer){
     #include <colorspace_fragment>
    }
   `});
-  material.userData.noReflection=true;const mesh=new T.Mesh(new T.PlaneGeometry(7.2,2.7,12,3),material);mesh.rotation.x=-Math.PI/2;mesh.position.y=.032;mesh.renderOrder=4;mesh.visible=false;root.add(mesh);
+  material.userData.noReflection=true;const mesh=new T.Mesh(new T.PlaneGeometry(6.1,2.3,12,3),material);mesh.rotation.x=-Math.PI/2;mesh.position.y=.032;mesh.renderOrder=4;mesh.visible=false;root.add(mesh);
   return {mesh,alpha,texture};
  });
  return {root,update(time:number){
