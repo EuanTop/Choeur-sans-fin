@@ -20,7 +20,9 @@ export function createHall(parts:SwanParts){
  for(const side of [-1,1]){
   for(let row=0;row<3;row++){
    for(let bay=0;bay<13;bay++){
-    const z=32.5-bay*5.4,g=new T.Group();g.position.set(side*pathX(z),row*GALLERY_STEP,z);g.rotation.y=-side*Math.PI/3;root.add(g);g.updateMatrix();singers.push({matrix:g.matrix.clone(),row,bay,side});
+    const z=32.5-bay*5.4,g=new T.Group();g.position.set(side*pathX(z),row*GALLERY_STEP,z);g.rotation.y=-side*Math.PI/3;root.add(g);g.updateMatrix();
+    // Leave the frontmost bays empty where the choir meets the carved pumpkin lip.
+    if(bay>0)singers.push({matrix:g.matrix.clone(),row,bay,side});
     const panel=new T.Mesh(panelGeometry,wall);panel.position.z=-.85;panel.castShadow=true;panel.receiveShadow=true;g.add(panel);
     const rim=new T.Mesh(rimGeometry,trim);rim.position.z=.015;rim.castShadow=true;g.add(rim);
     // Recesses have actual depth, a side return and a luminous back wall.
