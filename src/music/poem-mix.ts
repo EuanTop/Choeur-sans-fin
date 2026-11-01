@@ -30,8 +30,8 @@ export async function renderSpokenPoem(music:AudioBuffer,voiceName:string){
   source.connect(edge).connect(input);source.start(t,cue.sourceStart,duration);
  }
  const raw=await c.startRendering(),result=new AudioBuffer({numberOfChannels:2,length:DURATION*sr,sampleRate:sr});
- // Match only the spoken contribution, never the music bus. The three takes
- // occupy the same background level despite their different original dynamics.
+ // Match only the spoken contribution, never the music bus.
+ // The selected recording retains its own dynamic contour.
  let speechEnergy=0,musicEnergy=0;
  for(let ch=0;ch<2;ch++){
   const speech=raw.getChannelData(ch).subarray(DURATION*sr,DURATION*2*sr),score=music.getChannelData(ch);

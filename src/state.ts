@@ -2,7 +2,7 @@ export const DURATION=32;
 export const schema={
  aspect:{type:'enum',values:['3:4','9:16','16:9'],label:'Frame'},
  palette:{type:'enum',values:['Deep violet','Classic violet'],label:'Palette'},
- voice:{type:'enum',values:['Voice A','Voice B','Voice C'],label:'Poem voice'},
+ voice:{type:'enum',values:['Voice B'],label:'Poem voice'},
  poemVolume:{type:'number',min:0,max:3,label:'Poem volume'},
  analog:{type:'boolean',label:'Analog grain'},
  time:{type:'number',min:0,max:DURATION,label:'Scene time'},

@@ -1,10 +1,14 @@
 import test from 'node:test';
+import {readFileSync,lstatSync,readdirSync} from 'node:fs';
+import {createHash} from 'node:crypto';
 import assert from 'node:assert/strict';
-import {VOICE_NAMES,POEM_CUES,cuesFor,narrationEnd,riverPoemPose,riverPoemText} from '../src/music/poem.ts';
+import {VOICE_NAMES,takeFor,POEM_CUES,cuesFor,narrationEnd,riverPoemPose,riverPoemText} from '../src/music/poem.ts';
 import {musicVersionFor} from '../src/music/score.ts';
 
-test('three real takes share entrances while keeping their complete source phrases',()=>{
- assert.equal(new Set(VOICE_NAMES.map(musicVersionFor)).size,3);
+test('the approved take keeps all source phrases and rejects unpublished alternatives',()=>{
+ assert.deepEqual(VOICE_NAMES,['Voice B']);
+ assert.equal(new Set(VOICE_NAMES.map(musicVersionFor)).size,1);
+ assert.throws(()=>musicVersionFor('Voice A'));assert.throws(()=>musicVersionFor('Voice C'));
  for(const voice of VOICE_NAMES)for(const [i,c] of cuesFor(voice).entries()){
   assert.ok(c.sourceStart>=0&&c.sourceEnd>c.sourceStart);
   assert.ok(narrationEnd(c)<c.holdEnd,'the poem remains visible until its voice finishes');
@@ -27,4 +31,11 @@ test('river lettering stays ahead of the duck and closes invisibly at the loop',
 test('river text removes punctuation but retains French word apostrophes',()=>{
  for(const c of POEM_CUES)assert.ok(!/[.,;:!?…]/u.test(riverPoemText(c.text)));
  assert.ok(riverPoemText(POEM_CUES[4].text).includes('m’éloigne'));
+});
+
+test('the selected narration is a self-contained runtime asset with the approved bytes',()=>{
+ const path=new URL('../public'+takeFor('Voice B').url,import.meta.url);
+ assert.equal(lstatSync(path).isSymbolicLink(),false);
+ assert.equal(createHash('sha256').update(readFileSync(path)).digest('hex'),takeFor('Voice B').sha256);
+ assert.deepEqual(readdirSync(new URL('../public/audio/',import.meta.url)).filter(f=>/\.(wav|mp3)$/i.test(f)),['poem-fr-b.wav']);
 });

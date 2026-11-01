@@ -58,11 +58,13 @@ test('local control: atomic state, exact pause clock, Origin guards, capture lif
   tick=50000;s=await request('GET','/state');assert.ok(s.body.state.time<DURATION);assert.equal(s.body.state.paused,false);
   r=await request('PATCH','/state',{expectedRevision:2,patch:{time:0,paused:false}});assert.equal(r.status,200);tick=51000;s=await request('GET','/state');assert.equal(s.body.state.time,1);
   assert.equal((await request('GET','/music/score?voice=invalid')).status,400);
-  const a=(await request('GET','/music/score?voice=Voice%20A')).body,b=(await request('GET','/music/score?voice=Voice%20B')).body;
-  assert.notEqual(a.version,b.version);assert.equal(b.voice,'Voice B');
-  r=await request('PATCH','/state',{expectedRevision:3,patch:{voice:'Voice C'}});assert.equal(r.status,200);
-  assert.equal((await request('GET','/music/score')).body.voice,'Voice C');
-  assert.equal((await request('POST','/music/render',{revision:4,version:a.version,idempotencyKey:'wrong-take'})).status,409);
+  assert.equal((await request('GET','/music/score?voice=Voice%20A')).status,400);
+  assert.equal((await request('GET','/music/score?voice=Voice%20C')).status,400);
+  const b=(await request('GET','/music/score?voice=Voice%20B')).body;assert.equal(b.voice,'Voice B');
+  assert.equal((await request('PATCH','/state',{expectedRevision:3,patch:{voice:'Voice C'}})).status,400);
+  r=await request('PATCH','/state',{expectedRevision:3,patch:{voice:'Voice B'}});assert.equal(r.status,200);
+  assert.equal((await request('GET','/music/score')).body.voice,'Voice B');
+  assert.equal((await request('POST','/music/render',{revision:4,version:b.version+'-stale',idempotencyKey:'wrong-take'})).status,409);
   const before=(await request('GET','/music/score')).body.version;
   assert.equal((await request('PATCH','/state',{expectedRevision:4,patch:{poemVolume:3.01}})).status,400);
   assert.equal((await request('PATCH','/state',{expectedRevision:4,patch:{poemVolume:1.8}})).status,200);

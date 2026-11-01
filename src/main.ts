@@ -18,7 +18,7 @@ async function commitVolume(){
 }
 const choirGuide=document.createElement('p');choirGuide.className='note';choirGuide.innerHTML='Lower: Low voice (L) · Contralto (R)<br>Middle: Alto (L) · Mezzo (R)<br>Upper: Soprano I (L) · II (R)';controls.append(choirGuide);
 for(const [key,s] of Object.entries(schema)){
- if(key==='paused'||key==='music')continue;
+ if(key==='paused'||key==='music'||(s.type==='enum'&&s.values.length===1))continue;
  const label=document.createElement('label');label.innerHTML=`<span>${s.label}<output data-output="${key}"></output></span>`;
  const input=s.type==='enum'?document.createElement('select'):document.createElement('input');input.dataset.key=key;
  if(s.type==='boolean'){label.className='toggle';(input as HTMLInputElement).type='checkbox';}

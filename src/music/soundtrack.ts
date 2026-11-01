@@ -9,12 +9,12 @@ import {CHOIR_SECTIONS,voiceProfile,glottalWave} from './voices.ts';
 
 const SAMPLE_RATE=44100,hz=(midi:number)=>440*2**((midi-69)/12);
 let base:Promise<AudioBuffer>|undefined;const pending=new Map<string,Promise<AudioBuffer>>();
-export async function renderSoundtrackParts(voice='Voice A'){
+export async function renderSoundtrackParts(voice=defaults.voice){
  poemVersionFor(voice);base??=synthesize().catch(e=>{base=undefined;throw e;});const music=await base;
  if(!pending.has(voice))pending.set(voice,renderSpokenPoem(music,voice).catch(e=>{pending.delete(voice);throw e;}));
  return {music,poem:await pending.get(voice)!};
 }
-export async function renderSoundtrack(voice='Voice A',level=defaults.poemVolume){
+export async function renderSoundtrack(voice=defaults.voice,level=defaults.poemVolume){
  musicVersionFor(voice,level);const {music,poem}=await renderSoundtrackParts(voice),out=new AudioBuffer({numberOfChannels:2,length:music.length,sampleRate:music.sampleRate});
  for(let ch=0;ch<2;ch++){const a=music.getChannelData(ch),b=poem.getChannelData(ch),d=out.getChannelData(ch);for(let i=0;i<d.length;i++)d[i]=blendSample(a[i]!,b[i]!,level);}return out;
 }
@@ -113,13 +113,13 @@ export function createMusicPlayer(changed:()=>void=()=>{}){
   }catch(e){failed.add(voice);console.error(e);}finally{loading.delete(voice);changed();}})();loading.set(voice,request);changed();await request;
  }
  return {
-  isReady(voice='Voice A'){return Boolean(context&&context.state==='running'&&buffers.has(voice));},
+  isReady(voice=defaults.voice){return Boolean(context&&context.state==='running'&&buffers.has(voice));},
   isLoading(voice:string){return loading.has(voice);},
-  async unlock(voice='Voice A'){
+  async unlock(voice=defaults.voice){
    if(!context){context=new AudioContext();output=context.createGain();output.gain.value=.25;const limiter=context.createWaveShaper();limiter.curve=outputCurve();output.connect(limiter).connect(context.destination);}
    await context.resume();failed.delete(voice);await load(voice);if(!buffers.has(voice))throw Error('Could not load poem voice');
   },
-  update(time:number,paused:boolean,enabled:boolean,voice='Voice A',level=defaults.poemVolume){
+  update(time:number,paused:boolean,enabled:boolean,voice=defaults.voice,level=defaults.poemVolume){
    lastScene=time;if(!context||context.state!=='running')return;if(paused||!enabled){stop();return;}
    const buffer=buffers.get(voice);if(!buffer){stop();if(!failed.has(voice)&&!loading.has(voice))void load(voice);return;}
    const playhead=sources.length?(offset+context.currentTime-startTime)%DURATION:-1,delta=Math.abs(((playhead-time+DURATION*1.5)%DURATION)-DURATION*.5);

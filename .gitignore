@@ -12,3 +12,6 @@ artifacts
 *.mp3
 *.pdf
 *.zip
+
+# Approved runtime narration; generated music and other recordings stay ignored.
+!/public/audio/poem-fr-b.wav
