@@ -1,24 +1,26 @@
 import * as T from 'three';
 import {archWall,archRim,arch,box,solidRibbon,batch} from './geometry.ts';
 import {plaster,lightField} from './materials.ts';
+import {paletteMaterial} from './palettes.ts';
 import {detailMaterial} from './details.ts';
 import {fitHallGeometry} from './mouth-fit.ts';
+import {GALLERY_STEP,galleryFloorY} from './choir-grounding.ts';
 import {createChoir,type SwanParts,type Singer} from './choir.ts';
 
 /** A monumental water hall, with thick arcades and curved galleries. */
 export function createHall(parts:SwanParts){
  const singers:Singer[]=[];
  const root=new T.Group();root.name='Violet light hall';
- const wall=plaster('#432654'),recess=plaster('#2a173f'),trim=plaster('#795176'),floor=plaster('#69436e',.66),iron=detailMaterial('#694867',.065),warm=detailMaterial('#ff963f',.28,1.3),fixture=detailMaterial('#2a173f',.45);
+ const wall=paletteMaterial(plaster('#432654'),'wall'),recess=paletteMaterial(plaster('#2a173f'),'recess'),trim=paletteMaterial(plaster('#795176'),'trim'),floor=paletteMaterial(plaster('#69436e',.66),'floor'),iron=paletteMaterial(detailMaterial('#694867',.065),'iron'),warm=detailMaterial('#ff963f',.28,1.3),fixture=paletteMaterial(detailMaterial('#2a173f',.45),'fixture');
  const railings=new T.Group();railings.name='Continuous rails / pixel coverage';
  const panelGeometry=archWall(5.5,8.3,3.9,7.1,.85),rimGeometry=archRim(3.9,7.1,.13,.22);
  const glowGeometry=new T.ShapeGeometry(arch(3.65,6.9),40);{const p=glowGeometry.attributes.position!,uv=glowGeometry.attributes.uv!;for(let i=0;i<p.count;i++)uv.setXY(i,p.getX(i)/3.65+.5,p.getY(i)/6.9);}
- const amber=lightField('#ffbf68','#f37245',1.45),violet=lightField('#d992ff','#7538a8',.9);
+ const amber=lightField('#ffbf68','#f37245',1.45),violet=paletteMaterial(lightField('#d992ff','#7538a8',.9),'violetField');
  const pathX=(z:number)=>13.3+1.6*Math.sin((z+5)*.12);
  for(const side of [-1,1]){
   for(let row=0;row<3;row++){
    for(let bay=0;bay<13;bay++){
-    const z=32.5-bay*5.4,g=new T.Group();g.position.set(side*pathX(z),row*8.4,z);g.rotation.y=-side*Math.PI/3;root.add(g);g.updateMatrix();singers.push({matrix:g.matrix.clone(),row,bay,side});
+    const z=32.5-bay*5.4,g=new T.Group();g.position.set(side*pathX(z),row*GALLERY_STEP,z);g.rotation.y=-side*Math.PI/3;root.add(g);g.updateMatrix();singers.push({matrix:g.matrix.clone(),row,bay,side});
     const panel=new T.Mesh(panelGeometry,wall);panel.position.z=-.85;panel.castShadow=true;panel.receiveShadow=true;g.add(panel);
     const rim=new T.Mesh(rimGeometry,trim);rim.position.z=.015;rim.castShadow=true;g.add(rim);
     // Recesses have actual depth, a side return and a luminous back wall.
@@ -31,7 +33,7 @@ export function createHall(parts:SwanParts){
    }
   }
   // Broad continuous balcony plates with full thickness and quiet slender rails.
-  for(const y of [.65,8.4,16.8,25.2]){
+  for(const y of [0,1,2,3].map(galleryFloorY)){
    const pts=Array.from({length:124},(_,i)=>{const z=34-i*.54;return new T.Vector3(side*(pathX(z)-1.8),y,z);});
    const deck=new T.Mesh(solidRibbon(pts,4.8,.25),floor);deck.receiveShadow=true;root.add(deck);
    const curbPoints=pts.map(v=>new T.Vector3(side*(pathX(v.z)-4.15),y+.025,v.z));

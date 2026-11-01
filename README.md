@@ -11,7 +11,7 @@ npm ci
 npm run dev
 ```
 
-Open `http://127.0.0.1:5176/`. Default framing is 3:4 portrait. The collapsible panel controls time, swimming, water movement, light and viewpoint, with PNG capture. Enable music in the panel to hear the original synthesized choir and organ score. Side glances and wing gestures share its cue times. The panel and `npm run export` share a frame-accurate 4K export job, producing HEVC/AAC MP4 and an FFV1 RGB/PCM lossless master.
+Open `http://127.0.0.1:5176/`. Default framing is 3:4 portrait, with a deep violet palette and animated analog grain. Both the palette and grain can be changed in the panel. The collapsible panel controls time, swimming, water movement, light and viewpoint, with PNG capture. Enable music in the panel to hear the original synthesized choir and organ score. Side glances and wing gestures share its cue times. The panel and `npm run export` share a frame-accurate 4K export job, producing HEVC/AAC MP4 and an FFV1 RGB/PCM lossless master.
 
 ```sh
 npm test

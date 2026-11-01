@@ -1,6 +1,6 @@
 # Local control
 
-The Vite service binds to `127.0.0.1:5176`. The panel and API use the same state.
+The Vite service binds to `127.0.0.1:5176`. The panel and API use the same state. `palette` accepts `Deep violet` (default) or `Classic violet`; `analog` toggles the deterministic grain/dust finish (default `true`). The finish covers both the artwork and typography and uses the same looping scene clock.
 
 | Request | Result |
 |---|---|

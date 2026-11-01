@@ -8,6 +8,7 @@ import {ShaderPass} from 'three/addons/postprocessing/ShaderPass.js';
 import {FXAAShader} from 'three/addons/shaders/FXAAShader.js';
 import {createNestedWorld} from './lantern/world.ts';
 import {createDuck,createWake} from './lantern/duck.ts';
+import {applyPalette,paletteFor} from './lantern/palettes.ts';
 import {createWater} from './lantern/water.ts';
 import {createLighting} from './lantern/lighting.ts';
 import {phase} from './lantern/materials.ts';
@@ -27,12 +28,13 @@ export async function createArtwork(){
  const msaaSamples=Math.min(4,renderer.capabilities.maxSamples),target=new T.WebGLRenderTarget(1,1,{type:T.HalfFloatType,samples:msaaSamples});
  const composer=new EffectComposer(renderer,target);composer.addPass(new RenderPass(scene,camera));
  const bloom=new UnrealBloomPass(new T.Vector2(600,800),.28,.48,.85);composer.addPass(bloom);const output=new OutputPass();composer.addPass(output);const aa=new ShaderPass(FXAAShader);composer.addPass(aa);
- let width=0,height=0,lastTime=0,frameMs=0,frameCount=0;
+ let width=0,height=0,lastTime=0,frameMs=0,frameCount=0,lastPalette='';
  return {canvas:renderer.domElement,
   render(time:number,w:number,h:number,state:ArtState){
    const start=performance.now();lastTime=time;renderer.info.reset();renderer.shadowMap.needsUpdate=true;
    if(w!==width||h!==height){width=w;height=h;renderer.setSize(w,h,false);composer.setSize(w,h);aa.uniforms.resolution!.value.set(1/w,1/h);water.resize(w,h);}
-   setDetailViewport(h);passenger.update(time,state.motion);wake.update(time,state.motion);const zoom=world.update(time,state.motion);phase.value=zoom.u*TAU;water.update(phase.value,state.wind);lighting.update(time,state.light);
+   if(lastPalette!==state.palette){applyPalette(scene,state.palette);lastPalette=state.palette;}
+   setDetailViewport(h);passenger.update(time,state.motion);wake.update(time,state.motion);const zoom=world.update(time,state.motion);phase.value=zoom.u*TAU;water.update(phase.value,state.wind,paletteFor(state.palette).waterDepth);lighting.update(time,state.light);
    const angle=T.MathUtils.degToRad(state.camera*.25);camera.position.set(.5,6,30).applyAxisAngle(new T.Vector3(0,1,0),angle);camera.lookAt(0,4.5,-4);
    camera.aspect=w/h;camera.updateProjectionMatrix();camera.updateMatrixWorld(true);composer.render(0);
    if(errors.length)throw Error('GLSL compilation failed: '+errors.join('\n'));

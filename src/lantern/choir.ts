@@ -2,10 +2,12 @@ import * as T from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {mergeGeometries,mergeVertices} from 'three/addons/utils/BufferGeometryUtils.js';
 import {SimplifyModifier} from 'three/addons/modifiers/SimplifyModifier.js';
+import {CHOIR_SCALE,galleryFloorY} from './choir-grounding.ts';
 import {CHOIR_GROUPS,choirSection} from './choir-groups.ts';
 import {fitHallPoint,hallDerivatives} from './mouth-fit.ts';
 
 export const choirMotion={value:1};
+export const choirGrounds={value:new Float32Array(6)};
 export const choirPoses={value:Array.from({length:6},()=>new T.Vector4(.04,0,0,0))};
 export type SwanParts=Record<string,T.BufferGeometry>;
 export async function loadSwanParts():Promise<SwanParts>{
@@ -25,12 +27,12 @@ export type Singer={matrix:T.Matrix4;row:number;bay:number;side:number};
 export function createChoir(parts:SwanParts,singers:Singer[]){
  const root=new T.Group();root.name='Arcade swan choir';root.userData.dynamic=true;
  const matrices=singers.map(s=>{
-  const p=new T.Vector3(0,.35,.35).applyMatrix4(s.matrix),q=fitHallPoint(p);
+  const p=new T.Vector3(0,0,.35).applyMatrix4(s.matrix);p.y=galleryFloorY(s.row);const q=fitHallPoint(p);
   const [dx,dy,dz]=hallDerivatives(p) as [T.Vector3,T.Vector3,T.Vector3];
   const localForward=new T.Vector3(0,0,1).transformDirection(s.matrix);
   const forward=dx.clone().multiplyScalar(localForward.x).addScaledVector(dy,localForward.y).addScaledVector(dz,localForward.z).normalize();
   const up=new T.Vector3(0,1,0),right=up.clone().cross(forward).normalize();forward.copy(right).cross(up).normalize();
-  return new T.Matrix4().makeBasis(right,up,forward).scale(new T.Vector3(1.8,1.8,1.8)).setPosition(q);
+  return new T.Matrix4().makeBasis(right,up,forward).scale(new T.Vector3(CHOIR_SCALE,CHOIR_SCALE,CHOIR_SCALE)).setPosition(q);
  });
  for(const [key,source] of Object.entries(parts)){
   const geometry=source.clone();
@@ -40,7 +42,7 @@ export function createChoir(parts:SwanParts,singers:Singer[]){
   const material=new T.MeshStandardMaterial({color,roughness:.68,emissive:key==='dark'?'#000000':'#ad7862',emissiveIntensity:.12});
   const wing=key==='left'?-1:key==='right'?1:0;
   const deformation=`
-   uniform float uChoirMotion;uniform vec4 uSectionPose[6];attribute float aChoirSection;attribute vec3 aBodyShape;
+   uniform float uChoirMotion;uniform vec4 uSectionPose[6];uniform float uSectionGround[6];attribute float aChoirSection;attribute vec3 aBodyShape;
    mat3 choirX(float a){float c=cos(a),s=sin(a);return mat3(1.,0.,0.,0.,c,s,0.,-s,c);}
    mat3 choirY(float a){float c=cos(a),s=sin(a);return mat3(c,0.,-s,0.,1.,0.,s,0.,c);}
    mat3 choirZ(float a){float c=cos(a),s=sin(a);return mat3(c,s,0.,-s,c,0.,0.,0.,1.);}
@@ -53,20 +55,20 @@ export function createChoir(parts:SwanParts,singers:Singer[]){
    float breath(){return 1.+max(0.,pose().x-.04)*.012*uChoirMotion;}
    vec3 choirPosition(vec3 p){
     ${wing?`vec3 pivot=vec3(${(wing*.28).toFixed(2)},.60,.30);p=mix(p,pivot+wingRotation()*(p-pivot),wingWeight(p));`:`p=mix(p,vec3(0.,.62,.48)+headRotation()*(p-vec3(0.,.62,.48)),headWeight(p));`}
-    p.y*=breath();p=bodyRotation()*p;p.y+=pose().w*min(1.4,uChoirMotion);return p*aBodyShape;
+    p.y*=breath();p=bodyRotation()*p;p.y+=pose().w*min(1.4,uChoirMotion);p*=aBodyShape;p.y+=uSectionGround[int(aChoirSection)];return p;
    }
    vec3 choirNormal(vec3 n,vec3 p){${wing?'n=mix(n,wingRotation()*n,wingWeight(p));':'n=mix(n,headRotation()*n,headWeight(p));'}n.y/=breath();return normalize((bodyRotation()*n)/aBodyShape);}
   `;
   const inject=(shader:T.WebGLProgramParametersWithUniforms)=>{
-   shader.uniforms.uChoirMotion=choirMotion;shader.uniforms.uSectionPose=choirPoses;
+   shader.uniforms.uChoirMotion=choirMotion;shader.uniforms.uSectionPose=choirPoses;shader.uniforms.uSectionGround=choirGrounds;
    shader.vertexShader=deformation+shader.vertexShader;
    shader.vertexShader=shader.vertexShader.replace('#include <begin_vertex>','vec3 transformed=choirPosition(position);').replace('#include <beginnormal_vertex>','vec3 objectNormal=choirNormal(normal,position);');
   };
-  material.onBeforeCompile=inject;material.customProgramCacheKey=()=> 'choir-group-v1-'+key;
+  material.onBeforeCompile=inject;material.customProgramCacheKey=()=> 'choir-group-v2-'+key;
   const mesh=new T.InstancedMesh(geometry,material,singers.length);matrices.forEach((m,i)=>mesh.setMatrixAt(i,m));mesh.instanceMatrix.needsUpdate=true;mesh.computeBoundingSphere();if(mesh.boundingSphere)mesh.boundingSphere.radius+=3;mesh.castShadow=true;mesh.receiveShadow=true;
-  const depth=new T.MeshDepthMaterial({depthPacking:T.RGBADepthPacking});depth.onBeforeCompile=inject;depth.customProgramCacheKey=()=> 'choir-group-depth-v1-'+key;mesh.customDepthMaterial=depth;
+  const depth=new T.MeshDepthMaterial({depthPacking:T.RGBADepthPacking});depth.onBeforeCompile=inject;depth.customProgramCacheKey=()=> 'choir-group-depth-v2-'+key;mesh.customDepthMaterial=depth;
   // Point lights are intentionally unshadowed. Keep matching deformation for future changes.
-  const distance=new T.MeshDistanceMaterial();distance.onBeforeCompile=inject;distance.customProgramCacheKey=()=> 'choir-group-distance-v1-'+key;mesh.customDistanceMaterial=distance;
+  const distance=new T.MeshDistanceMaterial();distance.onBeforeCompile=inject;distance.customProgramCacheKey=()=> 'choir-group-distance-v2-'+key;mesh.customDistanceMaterial=distance;
   root.add(mesh);
  }
  root.userData.singers=singers.length;return root;
