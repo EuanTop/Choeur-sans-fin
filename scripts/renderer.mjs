@@ -70,7 +70,7 @@ export class Renderer {
  }
  async audio(state){
   await this.frame(0,64,64,state);
-  const r=await this.call('Runtime.evaluate',{expression:'window.art.renderMusic()',returnByValue:true,awaitPromise:true},90000);
+  const r=await this.call('Runtime.evaluate',{expression:`window.art.renderMusic(${JSON.stringify(state)})`,returnByValue:true,awaitPromise:true},90000);
   if(r.exceptionDetails)throw Error(r.exceptionDetails.exception?.description||r.exceptionDetails.text);
   if(typeof r.result?.value?.base64!=='string')throw Error('Music renderer did not return WAV data');
   return {...r.result.value,bytes:Buffer.from(r.result.value.base64,'base64')};

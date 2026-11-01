@@ -1,12 +1,14 @@
+import {hallImpulse} from './hall.ts';
+import {mixSpokenPoem} from './poem-mix.ts';
 import {DURATION} from '../state.ts';
 import {PERFORMANCE_CUES,sectionEnergyAt} from '../lantern/performance.ts';
-import {CHORDS,MUSIC_VERSION} from './score.ts';
+import {CHORDS,musicVersionFor} from './score.ts';
 import {vocalPitchTimeline,roleAt} from './arrangement.ts';
 import {CHOIR_SECTIONS,voiceProfile,glottalWave} from './voices.ts';
 
 const SAMPLE_RATE=44100,hz=(midi:number)=>440*2**((midi-69)/12);
-let pending:Promise<AudioBuffer>|undefined;
-export function renderSoundtrack(){return pending??=synthesize().catch(e=>{pending=undefined;throw e;});}
+let base:Promise<AudioBuffer>|undefined;const pending=new Map<string,Promise<AudioBuffer>>();
+export function renderSoundtrack(voice='Voice A'){musicVersionFor(voice);if(!pending.has(voice)){base??=synthesize().catch(e=>{base=undefined;throw e;});pending.set(voice,base.then(b=>mixSpokenPoem(b,voice)).catch(e=>{pending.delete(voice);throw e;}));}return pending.get(voice)!;}
 export function cyclePitchCorrection(frequencies:readonly number[],durations:readonly number[]){const cycles=frequencies.reduce((sum,f,i)=>sum+f*durations[i]!,0);return (Math.round(cycles)-cycles)/DURATION;}
 
 async function synthesize(){
@@ -14,8 +16,7 @@ async function synthesize(){
  master.gain.value=.72;compressor.threshold.value=-16;compressor.knee.value=16;compressor.ratio.value=1.7;compressor.attack.value=.035;compressor.release.value=.4;master.connect(compressor).connect(c.destination);
  let seed=7919;const random=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296*2-1;};
  const curve=(f:(time:number)=>number)=>{const v=new Float32Array(total*48+1);for(let i=0;i<v.length;i++)v[i]=f(i/48);return v;};
- const ir=c.createBuffer(2,Math.round(SAMPLE_RATE*7.2),SAMPLE_RATE);
- for(let ch=0;ch<2;ch++){const a=ir.getChannelData(ch);let low=0;for(let i=0;i<a.length;i++){const t=i/SAMPLE_RATE;low=.74*low+.26*random();a[i]=low*Math.exp(-t*.80)*Math.min(1,t/.12);}for(const [time,level] of [[.066,.24],[.117,.17],[.194,.12],[.301,.075]])a[Math.round((time!+ch*.013)*SAMPLE_RATE)]!+=level!;}
+ const ir=hallImpulse(c,random);
  const pre=c.createDelay(.2),reverb=c.createConvolver(),hp=c.createBiquadFilter(),lp=c.createBiquadFilter(),wet=c.createGain();
  pre.delayTime.value=.035;reverb.buffer=ir;hp.type='highpass';hp.frequency.value=135;lp.type='lowpass';lp.frequency.value=4800;wet.gain.value=.65;pre.connect(reverb).connect(hp).connect(lp).connect(wet).connect(master);
  function outlet(pan:number,send:number){const input=c.createGain(),p=c.createStereoPanner(),fx=c.createGain();p.pan.value=pan;fx.gain.value=send;input.connect(p).connect(master);p.connect(fx).connect(pre);return {input,panner:p,send:fx};}
@@ -76,24 +77,35 @@ async function synthesize(){
  for(let ch=0;ch<2;ch++){const data=raw.getChannelData(ch).subarray(DURATION*SAMPLE_RATE,DURATION*2*SAMPLE_RATE);result.copyToChannel(data,ch);for(const v of data)peak=Math.max(peak,Math.abs(v));}
  const gain=Math.min(12,.86/Math.max(.0001,peak));for(let ch=0;ch<2;ch++){const a=result.getChannelData(ch);for(let i=0;i<a.length;i++)a[i]!*=gain;}return result;
 }
-export async function musicWav(){
- const buffer=await renderSoundtrack(),length=buffer.length,bytes=new Uint8Array(44+length*4),v=new DataView(bytes.buffer);
+export async function musicWav(state:{voice:string}={voice:'Voice A'}){
+ const buffer=await renderSoundtrack(state.voice),length=buffer.length,bytes=new Uint8Array(44+length*4),v=new DataView(bytes.buffer);
  const word=(offset:number,text:string)=>{for(let i=0;i<text.length;i++)v.setUint8(offset+i,text.charCodeAt(i));};
  word(0,'RIFF');v.setUint32(4,36+length*4,true);word(8,'WAVE');word(12,'fmt ');v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,2,true);v.setUint32(24,SAMPLE_RATE,true);v.setUint32(28,SAMPLE_RATE*4,true);v.setUint16(32,4,true);v.setUint16(34,16,true);word(36,'data');v.setUint32(40,length*4,true);
  const left=buffer.getChannelData(0),right=buffer.getChannelData(1);for(let i=0;i<length;i++){v.setInt16(44+i*4,Math.round(Math.max(-1,Math.min(1,left[i]!))*32767),true);v.setInt16(46+i*4,Math.round(Math.max(-1,Math.min(1,right[i]!))*32767),true);}
  let binary='';for(let i=0;i<bytes.length;i+=16384)binary+=String.fromCharCode(...bytes.subarray(i,i+16384));
- return {version:MUSIC_VERSION,base64:btoa(binary)};
+ return {version:musicVersionFor(state.voice),base64:btoa(binary)};
 }
-export function createMusicPlayer(){
- let context:AudioContext|undefined,buffer:AudioBuffer|undefined,source:AudioBufferSourceNode|undefined,startTime=0,offset=0,lastScene=0;
+export function createMusicPlayer(changed:()=>void=()=>{}){
+ let context:AudioContext|undefined,source:AudioBufferSourceNode|undefined,startTime=0,offset=0,playing='',lastScene=0;
+ const buffers=new Map<string,AudioBuffer>(),loading=new Map<string,Promise<void>>(),failed=new Set<string>();
  const stop=()=>{source?.stop();source?.disconnect();source=undefined;};
+ async function load(voice:string){
+  if(buffers.has(voice))return;if(loading.has(voice))return loading.get(voice)!;
+  const request=(async()=>{try{let audio:AudioBuffer;
+   try{const response=await fetch('/__art/music/audio?voice='+encodeURIComponent(voice));if(!response.ok||response.headers.get('X-Music-Version')!==musicVersionFor(voice))throw Error('No current cached music');audio=await context!.decodeAudioData(await response.arrayBuffer());}
+   catch{audio=await renderSoundtrack(voice);}buffers.set(voice,audio);
+  }catch(e){failed.add(voice);console.error(e);}finally{loading.delete(voice);changed();}})();loading.set(voice,request);changed();await request;
+ }
  return {
-  isReady(){return Boolean(context&&context.state==='running'&&buffer);},
-  async unlock(){context??=new AudioContext();await context.resume();if(!buffer){try{const response=await fetch('/__art/music/audio');if(!response.ok||response.headers.get('X-Music-Version')!==MUSIC_VERSION)throw Error('No current cached music');buffer=await context.decodeAudioData(await response.arrayBuffer());}catch{buffer=await renderSoundtrack();}}},
-  update(time:number,paused:boolean,enabled:boolean){lastScene=time;if(!context||!buffer||context.state!=='running')return;if(paused||!enabled){stop();return;}
+  isReady(voice='Voice A'){return Boolean(context&&context.state==='running'&&buffers.has(voice));},
+  isLoading(voice:string){return loading.has(voice);},
+  async unlock(voice='Voice A'){context??=new AudioContext();await context.resume();failed.delete(voice);await load(voice);if(!buffers.has(voice))throw Error('Could not load poem voice');},
+  update(time:number,paused:boolean,enabled:boolean,voice='Voice A'){
+   lastScene=time;if(!context||context.state!=='running')return;if(paused||!enabled){stop();return;}
+   const buffer=buffers.get(voice);if(!buffer){stop();if(!failed.has(voice)&&!loading.has(voice))void load(voice);return;}
    const playhead=source?(offset+context.currentTime-startTime)%DURATION:-1;
    const delta=Math.abs(((playhead-time+DURATION*1.5)%DURATION)-DURATION*.5);
-   if(!source||delta>.10){stop();source=context.createBufferSource();source.buffer=buffer;source.loop=true;source.connect(context.destination);startTime=context.currentTime;offset=lastScene;source.start(startTime,offset);}
+   if(!source||playing!==voice||delta>.10){stop();source=context.createBufferSource();source.buffer=buffer;source.loop=true;source.connect(context.destination);startTime=context.currentTime;offset=lastScene;playing=voice;source.start(startTime,offset);}
   },
   dispose(){stop();void context?.close();}
  };

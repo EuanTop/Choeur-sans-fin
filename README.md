@@ -11,7 +11,7 @@ npm ci
 npm run dev
 ```
 
-Open `http://127.0.0.1:5176/`. Default framing is 3:4 portrait, with a deep violet palette and animated analog grain. Both the palette and grain can be changed in the panel. The collapsible panel controls time, swimming, water movement, light and viewpoint, with PNG capture. Enable music in the panel to hear the original synthesized choir and organ score. Side glances and wing gestures share its cue times. The panel and `npm run export` share a frame-accurate 4K export job, producing HEVC/AAC MP4 and an FFV1 RGB/PCM lossless master.
+Open `http://127.0.0.1:5176/`. Default framing is 3:4 portrait, with a deep violet palette and animated analog grain. Both the palette and grain can be changed in the panel. The collapsible panel controls time, swimming, water movement, light and viewpoint, with PNG capture. Enable music in the panel to hear the original synthesized choir and organ score. Side glances and wing gestures share its cue times. A supplied French reading is placed between choral phrases, with poetry fading on the river surface ahead of the duck. Choose Voice A / B / C in the panel. The panel and `npm run export` share a frame-accurate 4K export job, producing HEVC/AAC MP4 and an FFV1 RGB/PCM lossless master.
 
 ```sh
 npm test
@@ -21,3 +21,5 @@ npm run build
 `src/lantern/` contains the hollow shell, arcades, materials, water, character, lighting and scale cycle. The recursive transform `F(x) = 0.2x + (0, 0, -3.6)` shares a fixed point with the pullback, allowing each parent world to replace its child at the loop boundary. Six shared-geometry levels approximate the endless scene.
 
 The local `/__art` API shares panel state and supports exact-time PNG jobs, video export, cancellation and renderer diagnostics. See [control API](docs/control.md) and [credits](docs/credits.md). Generated media and private material stay in ignored `artifacts/`.
+
+The spoken edition uses three supplied recordings: `public/audio/poem-fr.mp3`, `poem-fr-b.wav` and `poem-fr-c.wav` (kept out of Git). Local entries link to the corresponding files in `artifacts/audio/narration-fr-02/`; supply the matching recordings before building or rendering music. Checksums and phrase alignments live in `src/music/poem.ts`.

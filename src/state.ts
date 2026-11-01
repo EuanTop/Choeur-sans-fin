@@ -2,6 +2,7 @@ export const DURATION=32;
 export const schema={
  aspect:{type:'enum',values:['3:4','9:16','16:9'],label:'Frame'},
  palette:{type:'enum',values:['Deep violet','Classic violet'],label:'Palette'},
+ voice:{type:'enum',values:['Voice A','Voice B','Voice C'],label:'Poem voice'},
  analog:{type:'boolean',label:'Analog grain'},
  time:{type:'number',min:0,max:DURATION,label:'Scene time'},
  paused:{type:'boolean',label:'Pause'},
@@ -11,7 +12,7 @@ export const schema={
  light:{type:'number',min:.3,max:1.8,label:'Amber light'},
  camera:{type:'number',min:-20,max:20,label:'Viewpoint'},
 } as const;
-export const defaults={aspect:'3:4',palette:'Deep violet',analog:true,time:0,paused:false,music:false,motion:1,wind:1,light:1,camera:0};
+export const defaults={aspect:'3:4',palette:'Deep violet',analog:true,voice:'Voice A',time:0,paused:false,music:false,motion:1,wind:1,light:1,camera:0};
 export type ArtState=typeof defaults;
 export function validatePatch(value:unknown):Partial<ArtState>{
  if(!value||typeof value!=='object'||Array.isArray(value))throw Error('Expected a parameter object');
