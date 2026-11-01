@@ -3,7 +3,7 @@ import {DURATION} from '../state.ts';
 export type VocalRole='foundation'|'inner'|'pad'|'lead'|'response'|'co-lead';
 export type VocalEvent={id:string;time:number;duration:number;midi:number;phrase:string;role:VocalRole;velocity:number;passing?:boolean};
 type Note=readonly [time:number,duration:number,midi:number,passing?:boolean];
-const roleGain:Record<VocalRole,number>={foundation:.34,inner:.46,pad:.32,lead:1,response:.73,'co-lead':.83};
+export const VOCAL_ROLE_GAIN:Readonly<Record<VocalRole,number>>={foundation:.34,inner:.46,pad:.32,lead:1,response:.73,'co-lead':.83};
 export function roleAt(time:number,section:number):VocalRole{
  const t=((time%DURATION)+DURATION)%DURATION;
  if(section===0)return 'foundation';if(section===1)return 'inner';
@@ -48,5 +48,5 @@ export function vocalActivityAt(time:number,section:number){
  const attack=Math.min(.18,span*.24),release=Math.min(.26,span*.25);
  const gate=smooth(start,start+attack,t)*(1-smooth(end-release,end,t));
  const contour=.87+.13*Math.sin(Math.PI*(t-start)/span);
- return gate*contour*n.velocity*roleGain[n.role];
+ return gate*contour*n.velocity*VOCAL_ROLE_GAIN[n.role];
 }

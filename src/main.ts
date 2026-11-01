@@ -10,6 +10,7 @@ const status=document.querySelector<HTMLElement>('#status')!;
 let state={...defaults},revision=-1,epoch='',anchor=performance.now(),lastAck=-1,lastPoll=0,busy=false;
 const player=createMusicPlayer();
 const controls=document.querySelector('#controls')!;
+const choirGuide=document.createElement('p');choirGuide.className='note';choirGuide.innerHTML='Lower: Low voice (L) · Contralto (R)<br>Middle: Alto (L) · Mezzo (R)<br>Upper: Soprano I (L) · II (R)';controls.append(choirGuide);
 for(const [key,s] of Object.entries(schema)){
  if(s.type==='boolean')continue;
  const label=document.createElement('label');label.innerHTML=`<span>${s.label}<output data-output="${key}"></output></span>`;
