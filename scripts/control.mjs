@@ -4,7 +4,7 @@ import {join} from 'node:path';
 import {defaults,schema,validatePatch,DURATION} from '../src/state.ts';
 import {musicScore,musicVersionFor,poemVersionFor,BASE_AUDIO_VERSION} from '../src/music/score.ts';
 import {Renderer} from './renderer.mjs';
-import {video,profiles} from './video.mjs';
+import {video,profiles,DEFAULT_PROFILE} from './video.mjs';
 
 export function controlPlugin({rendererFactory=(root,origin)=>new Renderer(root,origin),now=()=>performance.now(),exporter=video}={}){
  const epoch=randomUUID();
@@ -39,7 +39,7 @@ export function controlPlugin({rendererFactory=(root,origin)=>new Renderer(root,
     if(req.method!=='GET'&&req.headers.origin!=='http://'+req.headers.host)throw error(403,'Same-origin request required');
     const url=new URL(req.url,origin),path=url.pathname.slice(6);
     const requestedVoice=()=>{const v=url.searchParams.get('voice')??state.voice;if(!schema.voice.values.includes(v))throw error(400,'Unknown poem voice');return v;};
-    if(req.method==='GET'&&path==='')return reply(res,200,{protocol:1,project:'endless-chorus',duration:DURATION,profiles,capabilities:['schema','state.read','state.patch','capture','exports','jobs','jobs.cancel','music.score','music.render'],rendererConnected:renderer.ready});
+    if(req.method==='GET'&&path==='')return reply(res,200,{protocol:1,project:'choeur-sans-fin',duration:DURATION,profiles,capabilities:['schema','state.read','state.patch','capture','exports','jobs','jobs.cancel','music.score','music.render'],rendererConnected:renderer.ready});
     if(req.method==='GET'&&(path==='/music/base'||path==='/music/poem')){
      const version=path==='/music/base'?BASE_AUDIO_VERSION:poemVersionFor(requestedVoice());
      let bytes;try{bytes=await readFile(join(root,'artifacts/audio',version+'.wav'));}catch{throw error(404,'Audio stems have not been rendered');}
@@ -100,7 +100,7 @@ export function controlPlugin({rendererFactory=(root,origin)=>new Renderer(root,
      const b=await body(req),key=b.idempotencyKey;
      if(typeof key!=='string'||!key||key.length>128)throw error(400,'A bounded idempotency key is required');
      const sig='exports:'+JSON.stringify(b),prior=keys.get(key);if(prior){if(prior.signature!==sig)throw error(409,'Key belongs to another request');return reply(res,200,publicJob(jobs.get(prior.id)));}
-     const profile=b.profile??'portrait-4k';if(!Object.hasOwn(profiles,profile))throw error(400,'Unknown export profile');
+     const profile=b.profile??DEFAULT_PROFILE;if(!Object.hasOwn(profiles,profile))throw error(400,'Unknown export profile');
      if(b.revision!==revision)throw error(409,'Revision conflict');if(active)throw error(409,'A render is already running');if(jobs.size>=100)throw error(429,'Session job limit');
      const j={jobId:randomUUID(),status:'running',stage:'preparing',progress:0,revision,snapshot:current(),createdAt:new Date().toISOString(),deadline:Date.now()+60*60*1000,files:[]};
      jobs.set(j.jobId,j);keys.set(key,{signature:sig,id:j.jobId});active=j.jobId;

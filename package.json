@@ -1,9 +1,9 @@
 {
-  "name": "inside-the-lantern",
+  "name": "choeur-sans-fin",
   "version": "0.2.0",
   "private": true,
   "type": "module",
-  "description": "A swimming duck and an endlessly nested pumpkin light hall, rendered in Three.js.",
+  "description": "A swimming duck, nested pumpkin light halls and a synthesized choir with French poetry.",
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 5176 --strictPort",
     "check": "tsc --noEmit",

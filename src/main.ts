@@ -42,11 +42,11 @@ exportButton.addEventListener('click',async()=>{
  exportButton.disabled=true;cancelButton.hidden=false;
  try{
   await commitVolume();
-  const response=await fetch('/__art/exports',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({revision,profile:'portrait-4k',idempotencyKey:crypto.randomUUID()})});
+  const response=await fetch('/__art/exports',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({revision,profile:'portrait-hd',idempotencyKey:crypto.randomUUID()})});
   const started=await response.json();if(!response.ok)throw Error(started.error);exportJob=started.jobId;
   while(exportJob){
    const response=await fetch('/__art/jobs/'+exportJob),job=await response.json();if(!response.ok)throw Error(job.error);
-   exportStatus.textContent=job.status==='completed'?'Video and lossless master saved in artifacts/exports.':`${job.stage??job.status} · ${Math.round(job.progress*100)}%`;
+   exportStatus.textContent=job.status==='completed'?'MP4 saved in artifacts/exports/latest.':`${job.stage??job.status} · ${Math.round(job.progress*100)}%`;
    if(job.status==='completed')break;if(job.status==='failed'||job.status==='canceled')throw Error(job.error??'Export canceled');
    await new Promise(resolve=>setTimeout(resolve,1500));
   }

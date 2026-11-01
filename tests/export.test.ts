@@ -5,9 +5,9 @@ import {Readable} from 'node:stream';
 import {controlPlugin} from '../scripts/control.mjs';
 
 test('export commands bind a snapshot, deduplicate, guard profiles and cancel without exposing process handles',async()=>{
- let handler:any,resolveExport:any,snapshot:any,calls=0,killed=false;
- const plugin=controlPlugin({now:()=>0,rendererFactory:()=>({close(){},ready:false}),exporter:async(_root:any,_renderer:any,job:any)=>{
-  calls++;snapshot=job.snapshot;job.process={kill(){killed=true;}};
+ let handler:any,resolveExport:any,snapshot:any,profile:any,calls=0,killed=false;
+ const plugin=controlPlugin({now:()=>0,rendererFactory:()=>({close(){},ready:false}),exporter:async(_root:any,_renderer:any,job:any,preset:any)=>{
+  calls++;snapshot=job.snapshot;profile=preset;job.process={kill(){killed=true;}};
   await new Promise(resolve=>resolveExport=resolve);
  }});
  plugin.configureServer({config:{root:'.',server:{port:5176}},httpServer:{on(){}},middlewares:{use(fn:any){handler=fn;}}});
@@ -16,12 +16,12 @@ test('export commands bind a snapshot, deduplicate, guard profiles and cancel wi
   let status=0,body:any;const res={headersSent:false,writeHead(s:number){status=s;this.headersSent=true;},end(raw:string){body=JSON.parse(raw);}};
   await handler(req,res,()=>{});return {status,body};
  }
- const command={revision:0,profile:'portrait-4k',idempotencyKey:'export-one'};
+ const command={revision:0,idempotencyKey:'export-one'};
  assert.equal((await request('POST','/exports',command,'https://example.com')).status,403);
  assert.equal((await request('POST','/exports',{...command,profile:'unbounded'})).status,400);
  assert.equal((await request('POST','/exports',{...command,revision:7})).status,409);
  const started=await request('POST','/exports',command);assert.equal(started.status,202);const id=started.body.jobId;
- assert.equal((await request('POST','/exports',command)).body.jobId,id);assert.equal(calls,1);
+ assert.equal((await request('POST','/exports',command)).body.jobId,id);assert.equal(calls,1);assert.equal(profile,'portrait-hd');
  assert.equal((await request('POST','/exports',{...command,idempotencyKey:'second'})).status,409);
  await request('PATCH','/state',{expectedRevision:0,patch:{light:1.5}});assert.equal(snapshot.light,1);
  const running=(await request('GET','/jobs/'+id)).body;assert.equal(running.process,undefined);assert.equal(running.snapshot,undefined);assert.equal(running.timer,undefined);
